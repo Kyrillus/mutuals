@@ -14,7 +14,8 @@ the personal people crm for the agentic era
 * Name
 * Job (Founder, Investor, Operator, Student, Community builder, etc.)
 * City
-* Age (birthday reminder)
+* Company 
+* Age (birthday reminder?)
 * Area of interest
 * 
 * Additional information 
@@ -31,6 +32,7 @@ the personal people crm for the agentic era
 * Attio
 
 ## Questions/open to discuss 
-* Should we connect whatsapp chats, not only contacts? Use case: "Read my last 30 messages with x. Summarize and snyx to x.
+* Should we sync whatsapp chats, not only contacts? Use case: "Read my last 30 messages with x. Summarize and snyx to x.
 * Meeting/phone call sync ?
-* 
+* Server or local storage?
+* can we use an open source llm for all the agentic work within the system? 
