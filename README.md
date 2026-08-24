@@ -17,7 +17,8 @@ the personal people crm for the agentic era
 * Company 
 * Age (birthday reminder?)
 * Area of interest
-* 
+* Phone number
+* Email
 * Additional information 
 
 
@@ -31,7 +32,7 @@ the personal people crm for the agentic era
 * Monica
 * Attio
 
-## Questions/open to discuss 
+## Questions/things to discuss 
 * Should we sync whatsapp chats, not only contacts? Use case: "Read my last 30 messages with x. Summarize and snyx to x.
 * Meeting/phone call sync ?
 * Server or local storage?
