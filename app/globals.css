@@ -56,6 +56,19 @@
   --mu-accent-contrast: var(--acc-contrast);
   --mu-ring: var(--acc-base);
   --mu-selection: var(--acc-soft);
+
+  /* Abdunklung hinter echten Overlays (Slide-over, Dialog). Kein Farbton,
+     nur Schwarz mit Alpha - deshalb keine zweite Akzentfarbe. */
+  --mu-scrim: rgb(17 17 21 / 0.32);
+
+  /* Signalfarbe fuer Zerstoerendes: Loeschen-Aktion und Fehlermeldung.
+     Bewusst KEINE zweite Akzentfarbe: sie markiert nie Auswahl, Fokus, Stage
+     oder Tag, sondern ausschliesslich den Verlust von Daten. Ein Loeschen, das
+     wie jeder andere Knopf aussieht, und eine Fehlermeldung in Fliesstextgrau
+     waeren die schlechteren Alternativen. */
+  --mu-danger: #b4342b;
+  --mu-danger-strong: #8f281f;
+  --mu-danger-soft: #fbeceb;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -82,6 +95,12 @@
     --mu-accent-contrast: var(--acc-contrast);
     --mu-ring: var(--acc-base);
     --mu-selection: var(--acc-soft);
+
+    --mu-scrim: rgb(0 0 0 / 0.58);
+
+    --mu-danger: #f08a80;
+    --mu-danger-strong: #f8a89f;
+    --mu-danger-soft: #33201e;
   }
 }
 
@@ -153,6 +172,10 @@
   --color-accent-soft: var(--mu-accent-soft);
   --color-accent-contrast: var(--mu-accent-contrast);
   --color-ring: var(--mu-ring);
+  --color-scrim: var(--mu-scrim);
+  --color-danger: var(--mu-danger);
+  --color-danger-strong: var(--mu-danger-strong);
+  --color-danger-soft: var(--mu-danger-soft);
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", sans-serif;
