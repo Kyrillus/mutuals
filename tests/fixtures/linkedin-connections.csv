@@ -1,0 +1,45 @@
+Notes:
+"When exporting your connection data, you may notice that some of the email addresses are missing. You will only see email addresses for connections who have allowed their connections to see or download their email address using this setting https://www.linkedin.com/psettings/privacy/email. You can learn more here https://www.linkedin.com/help/linkedin/answer/261"
+
+First Name,Last Name,URL,Email Address,Company,Position,Connected On
+Paul,Brandner,https://www.linkedin.com/in/paulbrandner,,Alpine Health Ventures,Partner,14 Mar 2023
+Jürgen,Müller,https://www.linkedin.com/in/juergen-mueller-42,juergen.mueller@example.com,Siemens Healthineers,"Head of Engineering, Diagnostics",02 Feb 2021
+Tomaž,Kosmač,https://www.linkedin.com/in/tomaz-kosmac,,Belimed d.o.o.,Quality Manager,19 Nov 2022
+Aoife,O'Brien,https://www.linkedin.com/in/aoife-obrien,aoife@example.ie,"Stripe, Inc.",Account Executive,07 Jul 2024
+Lena,Schmidt,https://www.linkedin.com/in/lena-schmidt-ai,,Anthropic,Research Engineer,23 Jan 2025
+Marc-André,Dubois,https://www.linkedin.com/in/marc-andre-dubois,,BNP Paribas,"Director, Structured Finance",11 Sep 2019
+Yuki,Tanaka,https://www.linkedin.com/in/yuki-tanaka-hw,yuki.tanaka@example.jp,Sony Semiconductor,Hardware Architect,30 Apr 2023
+Sofia,Rossi,https://www.linkedin.com/in/sofia-rossi-climate,,Enel Green Power,Sustainability Lead,05 Dec 2021
+Ahmed,El-Sayed,https://www.linkedin.com/in/ahmed-elsayed,,,Freelance Consultant,16 Jun 2022
+Klara,Nováková,https://www.linkedin.com/in/klara-novakova,klara@example.cz,Rohlik Group,Product Manager,28 Aug 2024
+David,Chen,https://www.linkedin.com/in/davidchen-fintech,,Revolut,Staff Engineer,03 Mar 2020
+Ingrid,Larsen,https://www.linkedin.com/in/ingrid-larsen,,Ørsted,Head of Offshore Wind,21 Oct 2023
+Miguel,Santos,https://www.linkedin.com/in/miguel-santos-bio,miguel.santos@example.pt,BioAlfa,Founder & CEO,09 May 2024
+Hannah,Weber,https://www.linkedin.com/in/hannah-weber-design,,IDEO,Design Director,17 Feb 2022
+Rajesh,Kumar,https://www.linkedin.com/in/rajesh-kumar-ml,,Google DeepMind,Senior Research Scientist,26 Jul 2021
+Emma,Johansson,https://www.linkedin.com/in/emma-johansson,emma.j@example.se,Klarna,VP People,14 Nov 2023
+Luca,Bianchi,https://www.linkedin.com/in/luca-bianchi-hw,,Prima Additive,CTO,08 Jan 2025
+Nora,Haugen,https://www.linkedin.com/in/nora-haugen,,Equinor,Investment Manager,12 Apr 2022
+Piotr,Kowalski,https://www.linkedin.com/in/piotr-kowalski-eng,,Allegro,Engineering Manager,29 Sep 2020
+Fatima,Al-Rashid,https://www.linkedin.com/in/fatima-alrashid,,Mubadala,Principal,04 Jun 2024
+Jonas,Berg,https://www.linkedin.com/in/jonas-berg,,Northvolt,Plant Manager,22 Mar 2023
+Camille,Moreau,https://www.linkedin.com/in/camille-moreau,camille@example.fr,Doctolib,Head of Data,15 Aug 2021
+Ravi,Patel,https://www.linkedin.com/in/ravi-patel-health,,Babylon Health,Clinical Product Lead,01 Dec 2022
+Astrid,Lindqvist,https://www.linkedin.com/in/astrid-lindqvist,,Spotify,Staff Data Scientist,18 May 2020
+Ben,Okafor,https://www.linkedin.com/in/ben-okafor,,Flutterwave,Regional Director,25 Oct 2024
+Marta,Fernández,https://www.linkedin.com/in/marta-fernandez,,Cabify,COO,06 Feb 2023
+Simon,Fuhrbach,https://www.linkedin.com/in/simon-fuhrbach,,Tacto,Solution Engineer,10 Jan 2024
+Paul,Brandner,https://www.linkedin.com/in/paulbrandner,paul.brandner@example.com,Alpine Health Ventures,General Partner,14 Mar 2023
+JÜRGEN,MÜLLER,,juergen.mueller@example.com,Siemens Healthineers,Head of Engineering,02 Feb 2021
+  Lena  ,  Schmidt  ,,,Anthropic,Research Engineer,23 Jan 2025
+Kwame,,https://www.linkedin.com/in/kwame-a,,,,13 Jul 2023
+,Nakamura,https://www.linkedin.com/in/nakamura-k,,Toyota,,20 Feb 2022
+Elena,Petrova,https://www.linkedin.com/in/elena-petrova,ELENA.PETROVA@EXAMPLE.RU,"Yandex N.V.","Lead Designer, Maps & Navigation",03 Apr 2021
+Thomas,Berger,https://www.linkedin.com/in/thomas-berger,,"Berger, Meier & Partner GmbH",Managing Partner,27 Nov 2019
+Nina,Kovač,https://www.linkedin.com/in/nina-kovac,,Outfit7,Head of Growth,09 Sep 2024
+Oliver,Smith,https://www.linkedin.com/in/oliver-smith-vc,,Index Ventures,Investor,31 Jan 2022
+Zoe,Williams,https://www.linkedin.com/in/zoe-williams,,"Anthropic
+PBC",Recruiter,08 Aug 2025
+Felix,Bauer,https://www.linkedin.com/in/felix-bauer,,Celonis,"Director, Process Mining",02 Jun 2023
+Aisha,Diallo,https://www.linkedin.com/in/aisha-diallo,,Wave Mobile Money,Country Lead,19 Dec 2021
+Tobias,Rothe,https://www.linkedin.com/in/tobias-rothe,,Trade Republic,Head of Compliance,11 Mar 2025

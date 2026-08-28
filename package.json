@@ -9,6 +9,7 @@
     "start": "next start",
     "db:migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
+    "import": "tsx scripts/import.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

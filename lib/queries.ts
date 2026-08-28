@@ -189,6 +189,21 @@ export function normalizeTagName(name: string): string {
  * Import denselben Kontakt wieder, wenn der Export mal mit und mal ohne
  * "?originalSubdomain=de" oder Slash liefert. Laesst sich die URL nicht parsen,
  * bleibt der getrimmte Originaltext stehen.
+ *
+ * Zusaetzlich wird der Host vereinheitlicht: jeder linkedin.com-Host wird zu
+ * www.linkedin.com. Die Laendersubdomains (de., uk., m., ...) zeigen bei
+ * LinkedIn auf dasselbe Profil, sind also keine zweite Person.
+ *
+ * Diese Regel steht hier und NICHT im Import, obwohl nur der Import sie
+ * braucht - sie muss beim Speichern, beim Suchen und beim Dublettenvergleich
+ * dieselbe sein. Stuende sie nur im Import, entstuenden zwei kanonische Formen
+ * desselben Werts: gespeichert wuerde 'https://de.linkedin.com/in/zoe', und
+ * findContactByLinkedinUrl('https://www.linkedin.com/in/zoe') faende die Zeile
+ * nicht, obwohl der Import sie sehr wohl als Dublette erkennt.
+ *
+ * Die Richtung ist mit Absicht "auf www ergaenzen" und nicht "www abschneiden":
+ * so bleibt der haeufigste Fall (der Export liefert https://www.linkedin.com/…)
+ * unveraendert, und die Faltung fasst nur zusaetzliche Varianten zusammen.
  */
 export function normalizeLinkedinUrl(url: string): string {
   const trimmed = url.trim();
@@ -203,8 +218,10 @@ export function normalizeLinkedinUrl(url: string): string {
     return trimmed;
   }
   const host = parsed.hostname.toLowerCase();
+  const unifiedHost =
+    host === 'linkedin.com' || host.endsWith('.linkedin.com') ? 'www.linkedin.com' : host;
   const path = parsed.pathname.replace(/\/+$/, '');
-  return `https://${host}${path}`;
+  return `https://${unifiedHost}${path}`;
 }
 
 /** Maskiert LIKE-Sonderzeichen, damit ein Praefix wie "a_b" woertlich sucht. */
@@ -917,6 +934,17 @@ export function deleteContact(id: number): void {
  * Der Status bleibt ausdruecklich unangetastet: ein Import soll aus einem
  * gepflegten 'active'-Kontakt nichts anderes machen und aus einem
  * 'imported'-Kontakt auch nicht.
+ *
+ * WICHTIGE FOLGE, die man kennen muss: "leer" heisst hier NULL oder leerer
+ * String, und diese Funktion kann "noch nie gefuellt" nicht von "vom Menschen
+ * bewusst geleert" unterscheiden. Wer einen falschen Firmennamen loescht
+ * (updateContact({ company: null })), bekommt ihn beim naechsten Import
+ * derselben Datei erneut eingetragen - und zwar bei jedem Lauf wieder. Eine
+ * geAENDERTE Angabe gewinnt dauerhaft gegen den Import, eine geLOESCHTE nicht.
+ * Wer einen Wert endgueltig loswerden will, muss ihn in der Quelldatei
+ * korrigieren. (Die Alternative waere eine Markierung geleerter Felder, die
+ * enrichContact respektiert; die gibt es bewusst nicht, weil sie jedem
+ * einzelnen Feld einen zweiten Zustand gaebe.)
  */
 export function enrichContact(id: number, patch: ContactPatch): Contact {
   const contactId = idSchema.parse(id);

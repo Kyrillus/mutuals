@@ -77,3 +77,46 @@ Spalten: `First Name`, `Last Name`, `URL`, `Email Address`, `Company`,
 `Position`, `Connected On`. E-Mail ist bei den allermeisten Kontakten leer —
 LinkedIn liefert sie nur, wenn die Person das freigegeben hat. Der Import
 liefert also ein Skelett, keine fertige Datenbasis.
+
+## Import
+
+```
+npm run import -- <pfad> [--source=linkedin] [--sheet=<name|nr>] [--dry-run] [--yes]
+```
+
+Unterstützt `.csv`, `.xlsx` und `.xls`. Die Kopfzeile wird gesucht, nicht
+abgezählt; bei unbekannten Dateien zeigt die CLI den Mapping-Vorschlag samt
+Vorschau und fragt nach (`--yes` überspringt die Rückfrage, `--dry-run`
+rechnet alles durch, ohne zu schreiben).
+
+Rückgabewert 0, wenn der Lauf etwas importiert oder als bereits vorhanden
+erkannt hat, sonst 1 — ein Lauf, der gar nichts erreicht (Artikelliste statt
+Kontaktliste), ist im Cron-Betrieb damit vom Erfolg zu unterscheiden.
+
+**Ergänzen, nicht überschreiben.** Bei einer Dublette füllt der Import nur
+Felder, die leer sind. Gepflegte Werte bleiben stehen, der Status bleibt
+unangetastet.
+
+**Ein bewusst geleertes Feld gilt als leer.** Wer einen falschen Wert löscht,
+bekommt ihn beim nächsten Import derselben Datei wieder eingetragen, und zwar
+bei jedem Lauf erneut. Eine *geänderte* Angabe gewinnt dauerhaft gegen den
+Import, eine *gelöschte* nicht. Wer einen Wert endgültig loswerden will, muss
+die Quellzeile korrigieren.
+
+**Dubletten in drei Stufen:** Profil-URL, dann E-Mail, dann normalisierter
+Name. Die Namensstufe ist die schwächste — zwei Menschen können denselben
+Namen tragen. Deshalb zwei Sicherungen: Ein Treffer wird verworfen, wenn beide
+Seiten eine belastbare, aber verschiedene URL bzw. E-Mail tragen (dann sind es
+nachweislich zwei Personen), und bei einem reinen Namenstreffer schreibt der
+Import weder E-Mail noch Profil-URL. Solche Zeilen listet die Zusammenfassung
+einzeln zum Nachsehen auf.
+
+**Was nicht geraten wird:** mehrdeutige Datumsformate (`03/14/2023`),
+zweistellige Jahre und Platzhalter in der E-Mail-Spalte (`n/a`, `-`). Diese
+Werte werden verworfen *und in der Zusammenfassung gemeldet*, mit einem
+Beispiel aus der Datei.
+
+Der Import ist idempotent: dieselbe Datei zweimal einzulesen erzeugt keine
+Dubletten. Die gesamte Logik liegt in `lib/import/` und hängt nicht am
+Dateisystem (`parseBuffer` + `importParsedFile`), damit der Upload im
+Interface denselben Weg nimmt wie die CLI.
