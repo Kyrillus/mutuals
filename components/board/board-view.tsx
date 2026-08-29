@@ -38,7 +38,7 @@ import type {
   UniqueIdentifier,
 } from '@dnd-kit/core';
 import { useRouter } from 'next/navigation';
-import { startTransition, useCallback, useMemo, useOptimistic, useRef, useState } from 'react';
+import { startTransition, useCallback, useId, useMemo, useOptimistic, useRef, useState } from 'react';
 
 import { setStageAction } from '@/app/actions';
 import { ContactDetailSheet } from '@/components/contact-detail';
@@ -169,6 +169,8 @@ export function BoardView({ board }: BoardViewProps) {
   const total = rowsById.size;
   const activeRow = activeId === null ? null : (rowsById.get(activeId) ?? null);
 
+  const dndContextId = useId();
+
   const sensors = useSensors(
     // 4px Toleranz: ein Klick auf die Karte soll die Detailansicht oeffnen und
     // nicht als Mini-Zug enden.
@@ -282,6 +284,11 @@ export function BoardView({ board }: BoardViewProps) {
       </div>
 
       <DndContext
+        // Ohne feste id vergibt dnd-kit seine aria-describedby-Kennungen aus einem
+        // modulweiten Zaehler. Der steht beim Server-Rendern auf einem anderen Wert
+        // als im Browser, und React meldet beim Hydrieren eine Abweichung an jeder
+        // Karte. useId liefert eine Kennung, die auf beiden Seiten dieselbe ist.
+        id={dndContextId}
         sensors={sensors}
         collisionDetection={closestCorners}
         // Die Spalten aendern beim Verschieben ihre Hoehe; ohne staendiges
