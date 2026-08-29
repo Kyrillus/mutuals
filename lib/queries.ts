@@ -1117,10 +1117,29 @@ export function listOffers(contactId: number, opts?: { openOnly?: boolean }): Of
 
 const NOTE_COLUMNS = 'id, contact_id, body, occurred_on, created_at';
 
+/**
+ * occurred_on muss ein Datum sein, das es wirklich gibt.
+ *
+ * Die Form allein reicht nicht: "9999-99-99" und "2026-02-31" passen auf das
+ * Muster, bezeichnen aber keinen Tag. Der Wert wandert von hier aus nach
+ * contacts.last_contact_at, und der Vergleich dort ist ein reiner
+ * Stringvergleich - ein solcher Unwert stuende also dauerhaft vorn und keine
+ * spaetere echte Notiz koennte ihn je wieder ueberholen.
+ *
+ * Der Abgleich mit dem zurueckformatierten Date faengt beides ab: unmoegliche
+ * Zahlen und Tage, die es im jeweiligen Monat nicht gibt.
+ */
 const occurredOnSchema = z
   .string()
   .trim()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'occurred_on muss YYYY-MM-DD sein.');
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'occurred_on muss YYYY-MM-DD sein.')
+  .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      return false;
+    }
+    return parsed.toISOString().slice(0, 10) === value;
+  }, 'occurred_on muss ein gueltiges Kalenderdatum sein.');
 
 /**
  * Notiz anlegen. occurred_on ist standardmaessig heute.
@@ -1526,11 +1545,29 @@ interface FtsHit {
   rank: number;
 }
 
-/** FTS-Treffer inklusive bm25-Rang (kleiner ist besser). */
+/**
+ * FTS-Treffer inklusive bm25-Rang (kleiner ist besser), bereits auf aktive
+ * Kontakte eingeschraenkt.
+ *
+ * Der Statusfilter steht hier drin und NICHT beim Aufrufer, und das ist der
+ * ganze Witz an dieser Funktion. Stuende er dahinter, wuerde das LIMIT auf der
+ * ungefilterten Trefferliste wirken: bei einem LinkedIn-Import mit tausenden
+ * 'imported'-Kontakten fuellen genau die den Pool und verdraengen die wenigen
+ * kuratierten 'active'-Kontakte restlos. find_matches meldete dann "keine
+ * Kandidaten", obwohl gute existieren - und zwar stumm.
+ *
+ * Gemessen an einem Bestand mit fuenf passenden aktiven Kontakten: bei 100
+ * importierten Zeilen kamen noch alle fuenf durch, bei 199 nur einer, ab 250
+ * keiner mehr. Dieselbe Falle ist bei listContacts oben schon einmal
+ * zugeschnappt und dort auf demselben Weg geloest - Suche und Filter gehoeren
+ * in EINE Abfrage.
+ */
 function ftsSearch(matchExpression: string, limit: number): FtsHit[] {
   return allRows<FtsHit>(
-    'SELECT rowid AS id, rank AS rank FROM contacts_fts WHERE contacts_fts MATCH ? ' +
-      'ORDER BY rank LIMIT ?',
+    'SELECT f.rowid AS id, f.rank AS rank FROM contacts_fts f ' +
+      'JOIN contacts c ON c.id = f.rowid ' +
+      "WHERE contacts_fts MATCH ? AND c.status = 'active' " +
+      'ORDER BY f.rank LIMIT ?',
     [matchExpression, limit],
   );
 }
@@ -1605,11 +1642,17 @@ export function findMatches(params: {
 
   // Nur beim Freitext zaehlt auch das Profil: wer "Healthtech" sucht, meint
   // womoeglich die Person, bei der das in der Firma oder im Titel steht.
+  // Der Name ist hier bewusst NICHT dabei. Zwei Gruende: eine Namensgleichheit
+  // ist kein Grund, zwei Menschen zu verkuppeln - und ein Namenstreffer haette
+  // ohnehin keinen Beleg, weil collectEvidence die Profil-Belege nur aus
+  // company, title und how_we_met baut. Solche Kandidaten fielen unten still
+  // wieder heraus und haetten vorher nur Plaetze im Pool verbraucht.
+  // Wer eine bestimmte Person sucht, nimmt search_contacts.
   const profileExpression = ftsAnyOf(queryTerms);
   if (profileExpression !== null) {
     noteHit(
       ftsSearch(
-        ftsInColumns(['name', 'company', 'title', 'how_we_met'], profileExpression),
+        ftsInColumns(['company', 'title', 'how_we_met'], profileExpression),
         MATCH_CANDIDATE_POOL,
       ),
     );
