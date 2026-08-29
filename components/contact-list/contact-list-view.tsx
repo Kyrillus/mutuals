@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { CONTACTS_CHANGED_EVENT } from '@/lib/ui-events';
+
 import { listContactsAction, listFilterOptionsAction } from '@/app/actions';
 import { ContactDetailSheet } from '@/components/contact-detail';
 import { InlineError } from '@/components/ui';
@@ -58,6 +60,23 @@ export function ContactListView({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  /**
+   * Zaehler, der eine Wiederholung der aktuellen Abfrage erzwingt.
+   *
+   * Wird hochgezaehlt, wenn sich der Bestand ausserhalb dieser Ansicht geaendert
+   * hat - etwa weil die Kommandopalette per "N" einen Kontakt angelegt oder in
+   * ihrem eigenen Slide-over einen bearbeitet hat. Die Filter bleiben dabei
+   * unangetastet: es wird genau dieselbe Abfrage erneut gestellt, nicht auf den
+   * Ausgangszustand zurueckgesetzt.
+   */
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    const onChanged = () => setReloadToken((value) => value + 1);
+    window.addEventListener(CONTACTS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(CONTACTS_CHANGED_EVENT, onChanged);
+  }, []);
 
   /**
    * Unterscheidet "die Datenbank ist leer" von "der Filter ist zu eng" - zwei
@@ -147,10 +166,13 @@ export function ContactListView({
   const skipFirstLoad = useRef(true);
 
   useEffect(() => {
-    if (skipFirstLoad.current) {
+    // Beim allerersten Rendern sind initialRows bereits das Ergebnis dieser
+    // Abfrage. Ein angefordertes Neuladen muss aber auch dann durchlaufen.
+    if (skipFirstLoad.current && reloadToken === 0) {
       skipFirstLoad.current = false;
       return;
     }
+    skipFirstLoad.current = false;
 
     const seq = latestRequest.current + 1;
     latestRequest.current = seq;
@@ -177,7 +199,7 @@ export function ContactListView({
         setHasAnyContacts(false);
       }
     });
-  }, [request, sort]);
+  }, [request, sort, reloadToken]);
 
   const refreshOptions = useCallback(() => {
     void listFilterOptionsAction().then((result) => {

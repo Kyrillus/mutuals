@@ -691,22 +691,34 @@ export async function importPreviewAction(
  * zwischen zwei Anfragen, der ablaufen, verloren gehen oder zur falschen
  * Datei gehoeren kann. Ein zweiter Parserlauf ueber ein paar hundert
  * Kilobyte kostet nichts.
+ *
+ * dryRun reicht den Trockenlauf aus lib/import/run.ts durch: derselbe Lauf,
+ * dieselbe Transaktion, am Ende ein Rollback. Die Bilanz kommt vollstaendig
+ * zurueck, geschrieben wird nichts - deshalb entfaellt dann auch das
+ * revalidatePath, es gaebe nichts neu zu rendern.
  */
 export async function importCommitAction(
   formData: FormData,
   mapping: ColumnMapping,
   source: string,
+  dryRun: boolean = false,
 ): Promise<ActionResult<ImportSummary>> {
   try {
     const parsedMapping = columnMappingSchema.parse(mapping);
     const parsedSource = sourceSchema.parse(source);
+    const parsedDryRun = z.boolean().parse(dryRun);
     const { buffer, filename } = await readUpload(formData);
     const parsed = parseBuffer(buffer, filename);
 
     const summary = importParsedFile(parsed, {
       mapping: parsedMapping,
       source: parsedSource,
+      dryRun: parsedDryRun,
     });
+
+    if (parsedDryRun) {
+      return { ok: true, data: summary };
+    }
 
     revalidatePath('/');
     revalidatePath('/board');
