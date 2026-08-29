@@ -188,6 +188,40 @@ export function formatBirthday(value: string | null | undefined, fallback: strin
 }
 
 /**
+ * Ein Date als Kalendertag 'JJJJ-MM-TT' - lokal gerechnet, nicht in UTC.
+ *
+ * toISOString() waere hier falsch: es rechnet nach UTC um und liefert oestlich
+ * von Greenwich am spaeten Abend bereits den Folgetag. Ein Kalendertag ist
+ * aber genau das, was die lokale Uhr anzeigt.
+ */
+function toIsoDay(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * Wert fuer ein <input type="date">.
+ *
+ * Das Feld akzeptiert ausschliesslich 'JJJJ-MM-TT'. Alles andere - ein
+ * Zeitstempel, ein Geburtstag ohne Jahr, Muell - ergibt einen leeren String
+ * statt eines abgelehnten Werts: ein date-Feld mit unlesbarem value zeigt
+ * kommentarlos gar nichts an, und der Mensch haelt das fuer "nicht gesetzt".
+ */
+export function toDateInputValue(value: string | null | undefined): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const date = parseIso(value);
+  return date === null ? '' : toIsoDay(date);
+}
+
+/** Heute als 'JJJJ-MM-TT'. Vorgabe der Datumsfelder beim Erfassen. */
+export function todayIsoDate(now: Date = new Date()): string {
+  return toIsoDay(now);
+}
+
+/**
  * Namenskuerzel fuer Avatare: "Simon Fuhrbach" wird zu "SF".
  *
  * Genommen werden der erste und der letzte Namensteil; Einzelnamen ergeben

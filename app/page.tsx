@@ -1,54 +1,49 @@
-import { STAGES } from '@/lib/constants';
+import { ContactListView } from '@/components/contact-list/contact-list-view';
+
+import { listContactsAction, listFilterOptionsAction } from './actions';
 
 /**
- * Zwischenstand-Seite.
+ * Die Startseite: die Kontaktliste.
  *
- * Meilenstein 1 (Datenbank und Datenzugriffsschicht) steht, die Oberflaeche
- * aus Meilenstein 3 nicht. Diese Seite sagt genau das - sie ist bewusst kein
- * halbes Interface und behauptet nichts, was es noch nicht gibt. Sie wird
- * durch die Listenansicht ersetzt, sobald Meilenstein 3 gebaut ist.
+ * Die Seite ist eine Server-Komponente und tut genau zwei Dinge - den ersten
+ * Zustand holen und ihn an die Ansicht geben. Kein Zustand, kein Effekt, keine
+ * Bedienlogik: die liegt vollstaendig in components/contact-list.
+ *
+ * Warum der erste Zustand hier und nicht im Browser entsteht: die Liste ist
+ * damit im ersten gerenderten Bild schon gefuellt. Ein Client, der beim Mounten
+ * erst seine erste Abfrage stellt, zeigt fuer einen Moment eine leere Tabelle -
+ * bei einer lokalen SQLite-Datenbank ein selbst gemachtes Flackern.
+ *
+ * Geladen wird ueber dieselben Server Actions, die auch der Browser ruft. Sie
+ * sind gewoehnliche asynchrone Funktionen auf dem Server; sie hier zu benutzen
+ * statt lib/queries.ts direkt aufzurufen, haelt Validierung und Fehlertexte
+ * auf beiden Wegen identisch.
+ *
+ * force-dynamic, weil die Daten in einer lokalen Datei liegen und sich
+ * jederzeit aendern koennen - ein zur Bauzeit eingefrorenes Adressbuch waere
+ * fuer diese Anwendung sinnlos.
  */
-export default function HomePage() {
-  return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-8 px-6 py-16">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight text-fg">Mutuals</h1>
-        <p className="text-muted">Persoenliches CRM, lokal. Projektstand: Meilenstein 1 von 4.</p>
-      </header>
+export const dynamic = 'force-dynamic';
 
-      <section className="flex flex-col gap-2 border-t border-b border-border py-5">
-        <h2 className="font-medium text-fg">Fertig</h2>
-        <ul className="flex flex-col gap-1.5 text-muted">
-          <li>
-            <code className="font-mono text-fg">npm run db:migrate</code> legt das Schema an:
-            Kontakte, Needs, Offers, Notizen, Tags, Verbindungen und den Volltextindex.
-          </li>
-          <li>
-            <code className="font-mono text-fg">npm run seed</code> fuellt rund zwanzig
-            Beispielkontakte ein.
-          </li>
-          <li>
-            <code className="font-mono text-fg">npm test</code> prueft Normalisierung, Suche und
-            Matching.
-          </li>
-          <li>
-            Alle Abfragen liegen als benannte Funktionen in{' '}
-            <code className="font-mono text-fg">lib/queries.ts</code>.
-          </li>
-        </ul>
-      </section>
+export default async function HomePage() {
+  const [rowsResult, optionsResult] = await Promise.all([
+    // Leere Filter: listContacts blendet dann genau die archivierten Kontakte
+    // aus. Das ist der Standardfilter der Liste, und er steht nur an dieser
+    // einen Stelle - in der Datenzugriffsschicht.
+    listContactsAction({}),
+    listFilterOptionsAction(),
+  ]);
 
-      <section className="flex flex-col gap-2">
-        <h2 className="font-medium text-fg">Noch offen</h2>
-        <ul className="flex flex-col gap-1.5 text-muted">
-          <li>Meilenstein 2 — Import des LinkedIn-Exports (CSV und XLSX).</li>
-          <li>
-            Meilenstein 3 — diese Oberflaeche: Liste, Detailansicht und Board ueber die Stages{' '}
-            {STAGES.join(' → ')}.
-          </li>
-          <li>Meilenstein 4 — MCP-Server fuer den Zugriff aus Claude.</li>
-        </ul>
-      </section>
-    </main>
-  );
+  const rows = rowsResult.ok ? rowsResult.data : [];
+  const options = optionsResult.ok ? optionsResult.data : { cities: [], tags: [] };
+
+  // Scheitert das Laden der Auswahlwerte, bleibt die Liste trotzdem benutzbar;
+  // gemeldet wird der erste Fehler, der aufgetreten ist.
+  const error = !rowsResult.ok
+    ? rowsResult.error
+    : !optionsResult.ok
+      ? optionsResult.error
+      : null;
+
+  return <ContactListView initialRows={rows} initialOptions={options} initialError={error} />;
 }

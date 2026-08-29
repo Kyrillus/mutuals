@@ -22,25 +22,43 @@ export interface SheetProps {
   open: boolean;
   /** Wird bei Escape, Klick auf den Grund und Klick auf das Kreuz gerufen. */
   onClose: () => void;
-  title: string;
+  /**
+   * Optional - wie beim Dialog. Ohne Titel bleibt der Kopf eine schmale Leiste
+   * aus Aktionen und Schliessen-Kreuz, und der Inhalt fuehrt seine
+   * Ueberschrift selbst. Das ist der Fall der Detailansicht: dort ist der Name
+   * ein bearbeitbares Feld und kein Beschriftungstext, und darunter stehen
+   * zwei weitere Zeilen - beides passt nicht in eine 48px-Leiste. Ohne title
+   * MUSS ariaLabel gesetzt sein.
+   */
+  title?: string;
+  /** Pflicht, wenn kein title gesetzt ist. */
+  ariaLabel?: string;
   /** Zeile unter dem Titel, z.B. Firma und Ort. */
   subtitle?: ReactNode;
   /** Aktionen rechts im Kopf, links vom Schliessen-Kreuz. */
   actions?: ReactNode;
   footer?: ReactNode;
-  width?: 'md' | 'lg';
+  width?: 'md' | 'lg' | 'xl';
   children: ReactNode;
 }
 
-const WIDTHS: Record<'md' | 'lg', string> = {
+/**
+ * Drei Breiten, damit die Stufen bleiben, was sie sind: 'lg' liegt bei 520px
+ * (Detailansicht - zwei Spalten aus Beschriftung und Wert, ohne dass Zeilen
+ * umbrechen), 'xl' bei den frueheren 600px. Auf schmalen Fenstern gilt
+ * ohnehin w-full, das Panel nimmt dann die ganze Breite ein.
+ */
+const WIDTHS: Record<'md' | 'lg' | 'xl', string> = {
   md: 'max-w-[440px]',
-  lg: 'max-w-[600px]',
+  lg: 'max-w-[520px]',
+  xl: 'max-w-[600px]',
 };
 
 export function Sheet({
   open,
   onClose,
   title,
+  ariaLabel,
   subtitle,
   actions,
   footer,
@@ -55,7 +73,8 @@ export function Sheet({
     <dialog
       ref={dialogRef}
       aria-modal="true"
-      aria-labelledby={titleId}
+      aria-label={title === undefined ? ariaLabel : undefined}
+      aria-labelledby={title === undefined ? undefined : titleId}
       onClose={handleNativeClose}
       onKeyDown={handleKeyDown}
       className={DIALOG_ELEMENT_CLASS}
@@ -73,9 +92,11 @@ export function Sheet({
         >
           <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
             <div className="flex min-w-0 flex-1 items-baseline gap-2">
-              <h2 id={titleId} className="truncate text-lg font-semibold tracking-tight text-fg">
-                {title}
-              </h2>
+              {title === undefined ? null : (
+                <h2 id={titleId} className="truncate text-lg font-semibold tracking-tight text-fg">
+                  {title}
+                </h2>
+              )}
               {subtitle === undefined ? null : (
                 <span className="truncate text-sm text-muted">{subtitle}</span>
               )}
