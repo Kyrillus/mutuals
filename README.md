@@ -67,6 +67,112 @@ mutuals/
   scripts/import.ts      # CSV/XLSX-Import via CLI
 ```
 
+## Setup
+
+Voraussetzung ist **Node 22 oder neuer** — Next selbst käme mit 20.9 aus, aber
+`better-sqlite3` ist ein natives Modul und verlangt 22. Entwickelt und geprüft
+wurde mit Node 24 LTS.
+
+```
+npm install
+npm run db:migrate
+npm run dev
+```
+
+Die App läuft dann auf http://localhost:3000. `npm run db:migrate` legt
+`data/mutuals.db` an, falls die Datei fehlt, und spielt alle noch nicht
+angewandten Migrationen ein; ein zweiter Lauf tut nichts.
+
+`npm run seed` legt 21 erfundene Kontakte mit Needs, Offers, Tags und Notizen
+an, damit sich die Oberfläche ohne echten Import ansehen lässt — darunter drei
+Paare, an denen sich das Verkuppeln zeigen lässt. Das Skript ist idempotent und
+additiv; es lässt sich also auch auf eine bereits gefüllte Datenbank anwenden
+und mit `--reset` wieder zurücknehmen.
+
+Weitere Befehle:
+
+```
+npm test        # Tests zu Import-Parsing und Dublettenlogik
+npm run build   # Produktionsbuild
+npm run mcp:build   # kompiliert den MCP-Server nach mcp/dist/
+```
+
+Die Datenbank lässt sich über die Umgebungsvariable `MUTUALS_DB_PATH` umlenken.
+Das ist der Weg, etwas auszuprobieren, ohne den echten Bestand anzufassen:
+
+```
+MUTUALS_DB_PATH=/tmp/test.db npm run db:migrate
+MUTUALS_DB_PATH=/tmp/test.db npm run seed
+```
+
+**Backup ist Dateikopie.** `data/mutuals.db` ist die gesamte Datenbank; sie
+liegt nicht im Repo. Vor größeren Eingriffen lohnt sich `cp data/mutuals.db
+data/mutuals.db.backup`. Läuft die App gerade, gehören die Dateien
+`mutuals.db-wal` und `mutuals.db-shm` dazu.
+
+## MCP-Einrichtung
+
+Damit Claude auf die Kontakte zugreifen kann, muss der Server einmal kompiliert
+werden:
+
+```
+npm run mcp:build
+```
+
+Danach in `claude_desktop_config.json` eintragen (macOS:
+`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "mutuals": {
+      "command": "node",
+      "args": ["/Users/simonfuhrbach/code/crm/mcp/dist/server.js"]
+    }
+  }
+}
+```
+
+Der Pfad muss absolut sein. Ein `cwd` ist nicht nötig: der Server sucht die
+Projektwurzel selbst und findet `data/mutuals.db` auch, wenn Claude Desktop ihn
+ohne sinnvolles Arbeitsverzeichnis startet. Liegt die Datenbank woanders, lässt
+sich das über einen `env`-Block in derselben Konfiguration überschreiben:
+
+```json
+"env": { "MUTUALS_DB_PATH": "/pfad/zur/mutuals.db" }
+```
+
+Nach dem Eintragen Claude Desktop neu starten. Der Server meldet beim Start auf
+stderr, welche Datenbank er benutzt und wie viele Kontakte darin stehen; diese
+Zeilen stehen im Log von Claude Desktop. Fehlt das Schema, sagt die Meldung das
+ausdrücklich und nennt den Befehl zum Migrieren — ein Tippfehler im Pfad ist
+sonst nicht davon zu unterscheiden, weil SQLite eine unbekannte Datei
+stillschweigend als leere Datenbank anlegt.
+
+### Werkzeuge
+
+| Werkzeug | Zweck |
+|---|---|
+| `search_contacts` | Volltext und Filter, kompakte Treffer. Zum Nachschlagen einer Person. |
+| `get_contact` | Ein Kontakt vollständig, inklusive Needs, Offers und Tags. |
+| `create_contact` / `update_contact` | Anlegen und ändern. |
+| `add_note` | Notiz anhängen. |
+| `add_need` / `add_offer` | Was jemand sucht bzw. bieten kann. |
+| `resolve_need` | Need als erledigt markieren, nicht löschen. |
+| `set_stage` | Phase ändern. |
+| `find_matches` | Das Kernwerkzeug: wer aus dem Netzwerk passt zu wem. |
+
+**Notizen sind die private Schicht.** Sie stehen nicht im Volltextindex,
+tauchen in keinem Suchergebnis auf und kommen über `get_contact` nur zurück,
+wenn `include_notes: true` ausdrücklich gesetzt ist. Claude sieht sie also nicht
+beiläufig beim Stöbern, sondern nur, wenn danach gefragt wird.
+
+**`find_matches` liefert Kandidaten, keine Empfehlung.** Es gibt bewusst keinen
+Score: die Überlappung ist schlichter Stichwort- und Tag-Abgleich, und eine Zahl
+würde eine Sicherheit behaupten, die dahinter nicht steht. Jeder Kandidat kommt
+mit den konkreten Feldern, auf denen die Überlappung beruht — das Urteil bildet
+sich daran, nicht an einer Rangziffer.
+
 ## Kontext zum LinkedIn-Export
 
 Der Export kommt als `Connections.csv` und hat **drei Zeilen Präambel**
