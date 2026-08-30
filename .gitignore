@@ -1,0 +1,5 @@
+!.env.example
+.DS_Store
+.env
+.env.*
+.idea/
