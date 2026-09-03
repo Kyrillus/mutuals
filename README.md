@@ -25,7 +25,7 @@ Most CRMs are built for sales teams. This one is built for a person and their ne
   plan. The source of truth for product decisions. Reference screenshots in [`docs/refs/`](./docs/refs).
 - [`docs/PLAN.md`](./docs/PLAN.md) — the implementation plan, in two layers: a plain summary and the
   technical detail.
-- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 83 records.
+- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 86 records.
   `docs/adr-archive/` keeps the reasoning trail, including the designs that were rejected.
 
 ### Running it
