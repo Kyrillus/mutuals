@@ -17,6 +17,7 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
+          env: { TZ: 'UTC' },
           include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts'],
           exclude: ['**/*.db.test.ts', '**/node_modules/**'],
           environment: 'node',
@@ -25,6 +26,7 @@ export default defineConfig({
       {
         test: {
           name: 'integration',
+          env: { TZ: 'UTC' },
           include: ['packages/db/src/**/*.db.test.ts', 'apps/api/src/**/*.db.test.ts'],
           environment: 'node',
           globalSetup: ['./packages/db/src/test-support/global-setup.ts'],

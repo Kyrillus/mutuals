@@ -622,7 +622,7 @@ describe('identifier write-through', () => {
     expect(rows.map((row) => row.value)).toContain('+49891234567')
   })
 
-  it('keeps a value that will not normalise, and writes no canonical identifier for it', async () => {
+  it('keeps a value that will not normalise, and refuses it as an identifier', async () => {
     const email = await attributeIdBySlug('contact', 'email')
     await setValue(testDb(), {
       recordId: contact,
@@ -640,14 +640,20 @@ describe('identifier write-through', () => {
       .where('kind', '=', 'email')
       .execute()
 
-    // `writeIdentifiers` declines, because `not-an-email` has no canonical form. The row that is
-    // here is `project_record`'s: step 3 of the projector writes `text_norm` for every email,
-    // phone, linkedin_url and website value, valid or not. The two write-throughs therefore
-    // disagree, and the SQL one can put a non-email into `identifier` under kind 'email' — which
-    // makes two contacts whose email field says "n/a" identifier twins for duplicate matching.
-    // Left as it is on purpose: the fix is architectural (ADR-019 forbids a second normaliser, so
-    // the projector cannot learn what a valid email is) and belongs in an ADR, not in a test.
-    expect(rows.map((row) => row.value)).toEqual(['not-an-email'])
+    // Both write-throughs decline, and for the same reason. `writeIdentifiers` declines because
+    // `not-an-email` has no canonical form; the projector declines because migration 0008 added
+    // `mutuals_identifier_plausible()` to step 3. Before that migration the projector wrote
+    // `text_norm` for every email, phone, linkedin_url and website value, valid or not — so two
+    // contacts whose email field said "n/a" became identifier twins scoring 0.97, which is
+    // ADR-042's `certain` band, the one band that needs no human judgement.
+    //
+    // The predicate is not a second normaliser and does not violate ADR-019: it decides only
+    // whether a value is an identity claim at all, never what its canonical form is.
+    expect(rows).toEqual([])
+
+    // The value itself is untouched — it is still what the user typed, and still the current value
+    // of the attribute. Only its promotion to an identity claim was refused.
+    expect((await values(email)).map((row) => row.text_value)).toEqual(['not-an-email'])
   })
 
   it('accumulates every handle ever seen, including superseded ones (§4.6)', async () => {

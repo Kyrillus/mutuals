@@ -1,6 +1,7 @@
 # Mutuals — Implementation Plan (Stage 0)
 
-**Status:** awaiting approval from Simon and the co-founder, per brief §2.1 Step 4.
+**Status:** approved. **Stage 1 is complete** — see §5 for what its definition of done actually
+measured. Stage 2 has not started.
 **Branch:** `version/claude-v1`. **Source of truth for product decisions:** [`BRIEF.md`](./BRIEF.md).
 **Decision log:** [`DECISIONS.md`](./DECISIONS.md) — 83 ADRs. **Rejected designs:** `adr-archive/`.
 

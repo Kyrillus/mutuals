@@ -34,7 +34,7 @@ export const EXPECTED_COUNTS = {
   organizations: 60,
   interactions: 500,
   followUps: 40,
-  contactViews: 4,
+  contactViews: 5,
   organizationViews: 1,
   /** A floor, not an equality: the decoy tags are random and could accidentally add a match. */
   minAskOfferMatches: 10,

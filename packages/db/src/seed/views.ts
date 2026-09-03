@@ -95,6 +95,20 @@ export const DEFAULT_VIEWS: readonly SavedViewSeed[] = [
     position: 3,
   },
   {
+    objectType: 'contact',
+    // The other half of the view above. Because filters are AND-only, "gone quiet" and "never
+    // spoke" cannot share one view -- so rather than a view whose name promises more than it can
+    // deliver, they are two views that each mean exactly what they say. This is the answer to the
+    // plan's open question Q3, and it is arguably the more actionable of the pair: a freshly
+    // imported LinkedIn export lands entirely in here rather than swamping the other one.
+    name: 'Never contacted',
+    isDefault: false,
+    columns: [...CONTACT_COLUMNS.slice(0, 8), 'created_at'],
+    filters: [{ field: 'last_interaction_at', op: 'is_empty' }],
+    sort: { field: 'created_at', direction: 'desc' },
+    position: 4,
+  },
+  {
     objectType: 'organization',
     name: 'All organizations',
     isDefault: true,

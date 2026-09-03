@@ -1,7 +1,8 @@
 # Mutuals — Architecture Decision Record log
 
-**Status:** Stage 0, awaiting approval. Four of the original open questions have been answered (§14);
-four remain and none of them blocks Stage 1.
+**Status:** Stage 1 complete. ADR-001…083 were written in Stage 0; ADR-084…086 (§15) were forced
+by the build itself. Of §14's open questions, Q3 is answered by ADR-086; Q4, Q5 and Q6 remain and
+none of them blocks Stage 2.
 **Scope:** this is the ADR log the brief requires in §2.2 — one record per decision, each with
 context, options, choice and consequences, ordered so a reader meets foundational decisions first.
 Every later decision that changes something here is appended, never edited in place, and the brief
@@ -2466,7 +2467,7 @@ repo ships Postgres 16 exactly as §3.1 fixes it.
 
 ### Still open
 
-**Q3 — "No interaction in 90 days" (Simon).** §6.2 seeds that view. Does it include people you have
+**Q3 — "No interaction in 90 days" (Simon). ANSWERED — see ADR-086.** §6.2 seeds that view. Does it include people you have
 **never** contacted? Options: **(a)** exclude them, and seed a second view `Never contacted`
 (recommended — the view means "people who have gone quiet", and the second list is arguably the more
 actionable of the two); (b) include them, at the cost of a freshly imported 10k-row LinkedIn export
@@ -2498,3 +2499,89 @@ _(One item is not a question but needs an acknowledgement: ADR-045 adds `phone_r
 to the Profile in §6.6. Both are needed — phone numbers like `089 1234567` cannot be normalised
 without a region, and warmth cannot decay on whole civil days without a timezone. `docs/BRIEF.md` is
 updated in the same PR, per §2.1.)_
+
+---
+
+## 15. Stage 1 addenda — decisions the build itself forced
+
+Three of the four questions §14 left open were answered by measurement rather than by discussion.
+Each is a full ADR; they are numbered on from 083.
+
+### ADR-084 — Five indexes behind foreign keys, because deletion was 4 seconds
+
+**Context.** `pnpm db:check` generated 10,000 contacts × 60 attributes and measured every operator
+shape. Every read was between 0.09 ms and 10.7 ms, comfortably inside the extrapolations §13 warned
+were unverified. One shape was not: **deleting a single contact took 4.0 seconds**, and bulk deletion
+was quadratic. Postgres indexes the _referenced_ side of a foreign key automatically, because it is a
+primary key, but never the _referencing_ side — so every `ON DELETE CASCADE` and `ON DELETE SET NULL`
+sequentially scanned a large table to find the rows it was about to touch. The performance harness had
+been silently creating four such indexes for itself, purely so it could clean up after its own run;
+that workaround is what exposed the gap.
+
+**Options.** (1) Leave it: a personal CRM deletes rarely. (2) Index the four cascade paths.
+(3) Index every unindexed referencing column.
+
+**Choice.** Option 2, plus a fifth the record-deletion measurement could not see. Migration 0007 adds
+`fact (superseded_by_id) WHERE NOT NULL`, `fact (target_record_id) WHERE NOT NULL`,
+`attribute_value (fact_id)`, `record_link (fact_id)` and `fact (attribute_id)`.
+
+**Consequences.** Deleting one contact went from **4.0 s to 1.03 ms**, re-measured on the same
+dataset. The fifth index covers a different operation entirely: `fact_shape_fk` references
+`attribute_definition`, and every index on `fact` leads with `record_id`, so **deleting an attribute
+definition** — §6.7's flow, behind a dialog that promises to state how many records are affected —
+scanned the whole fact log. `attribute_value` needed no equivalent because ADR-013 already leads all
+nine of its indexes with `attribute_id`. Option 3 was rejected: the remaining unindexed referencing
+columns are `workspace_id` (whose parent row is never deleted) and `option_id` (whose parent is
+`ON DELETE RESTRICT` and archived rather than deleted, per ADR-016), so indexing them would cost write
+throughput to speed up something that does not happen. `MISSING_FK_INDEXES` stays in the harness as an
+empty seam, so a future finding can be reproduced by putting an index back before it becomes a
+migration.
+
+### ADR-085 — A plausibility predicate on the identifier write-through
+
+**Context.** Found by the integration suite, not by reading the SQL. The projector's step 3 wrote
+every `email`, `phone`, `linkedin_url` and `website` value into `identifier`, valid or not.
+`identifier` is exactly what duplicate detection probes, and ADR-042 scores a shared identifier of
+those kinds at 0.95 or above — so two contacts whose email field said `n/a` became identifier twins
+scoring 0.97, landing in the `certain` band, the one band whose entire purpose is that it needs no
+human judgement. The TypeScript write-through already declined such values; the SQL projector did not,
+and the two disagreed.
+
+**Options.** (1) Stop the projector writing identifiers and let `writeIdentifiers` own it — which
+loses identifiers for any write that bypasses the application (raw psql, the bulk importer, a future
+MCP client). (2) A plausibility predicate in SQL. (3) Leave it and filter at read time in the
+duplicate matcher.
+
+**Choice.** Option 2. Migration 0008 adds `mutuals_identifier_plausible(kind, value)` and ANDs it into
+step 3, then deletes the rows the earlier behaviour had already written.
+
+**Consequences.** This does **not** violate ADR-019's one-normaliser rule, and the distinction is the
+whole reason the option is acceptable: the predicate decides only whether a value is an _identity
+claim at all_, never what its canonical form is. Normalisation remains SQL-only and singular. It is
+deliberately permissive — an email needs an `@` and a dot after it, a phone seven digits, a LinkedIn
+handle the canonical `in/…` shape, a website a dot and a TLD — because real validation lives in
+`packages/core` and runs on every path that matters, while this guard exists only for the paths that
+bypass it. Verified against the live database: `n/a`, `-`, `none`, `not available`, `123` and `tbd`
+are all refused, and `anna@northstar.vc`, `+4989123456789`, `in/anna-berger` and `northstar.vc` are
+all accepted. Option 3 was rejected because it leaves the wrong data in the table and obliges every
+future reader to remember the filter.
+
+### ADR-086 — "No interaction in 90 days" and "Never contacted" are two views (answers Q3)
+
+**Context.** §14's Q3 asked whether the seeded view includes people never contacted. The filter model
+is AND-only by design (ADR-032), so one view cannot express "last interaction older than 90 days OR
+no interaction at all" — `last_interaction_at` is NULL for someone never contacted, and
+`older_than` compiles to `column < cutoff`, which NULL fails.
+
+**Options.** (1) One view that silently means only "gone quiet". (2) Two views. (3) Add an OR group,
+or a dedicated `is_stale` operator, to the filter model.
+
+**Choice.** Option 2. `No interaction in 90 days` keeps the literal reading; `Never contacted` is
+seeded beside it, filtered on `last_interaction_at is_empty` and sorted by most recently added.
+
+**Consequences.** Both views now mean exactly what their names say, which option 1 could not claim.
+`Never contacted` is arguably the more actionable of the pair: a freshly imported 10,000-row LinkedIn
+export lands entirely in it rather than swamping the other one. Option 3 was rejected as a wire-format
+change made to serve a seed script — if an OR group is ever wanted it should be wanted for its own
+reasons. The seed's count assertion caught this change immediately when the expected view count was
+still 4, which is the assertion working as designed.

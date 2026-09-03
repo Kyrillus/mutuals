@@ -608,12 +608,10 @@ export interface PerfCleanup {
  * because removing its 650,000 rows without them takes longer than generating them, and drops them
  * again so the schema it leaves behind is exactly the schema the migrations describe.
  */
-export const MISSING_FK_INDEXES = [
-  ['perf_tmp_fact_superseded_idx', 'fact (superseded_by_id) where superseded_by_id is not null'],
-  ['perf_tmp_fact_target_idx', 'fact (target_record_id) where target_record_id is not null'],
-  ['perf_tmp_av_fact_idx', 'attribute_value (fact_id)'],
-  ['perf_tmp_rl_fact_idx', 'record_link (fact_id)'],
-] as const
+// Empty since migration 0007: the four indexes this harness used to create for itself are now
+// part of the schema, together with a fifth for attribute deletion. Kept as a seam so a future
+// finding can be reproduced by putting an index back here before it becomes a migration.
+export const MISSING_FK_INDEXES: readonly (readonly [string, string])[] = []
 
 async function withCascadeIndexes<T>(exec: Executor, run: () => Promise<T>): Promise<T> {
   for (const [name, definition] of MISSING_FK_INDEXES) {

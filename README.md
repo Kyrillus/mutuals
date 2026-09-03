@@ -19,7 +19,7 @@ Most CRMs are built for sales teams. This one is built for a person and their ne
 
 ## Status
 
-**Pre-alpha. Stage 0 — the plan is written and awaiting approval. Nothing to install yet.**
+**Pre-alpha. Stage 1 of 7 is done: the engine runs and is documented. No user interface yet — that is Stage 2.**
 
 - [`docs/BRIEF.md`](./docs/BRIEF.md) — the product specification: data model, every screen, the build
   plan. The source of truth for product decisions. Reference screenshots in [`docs/refs/`](./docs/refs).
@@ -28,7 +28,20 @@ Most CRMs are built for sales teams. This one is built for a person and their ne
 - [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 83 records.
   `docs/adr-archive/` keeps the reasoning trail, including the designs that were rejected.
 
-Setup instructions, screenshots and a roadmap land here as the stages are built.
+### Running it
+
+```bash
+corepack enable pnpm     # once; pnpm ships with Node but is not on PATH by default
+pnpm install
+pnpm dev                 # starts the database, migrates it, runs the API
+pnpm seed                # ~200 contacts, 60 organizations, 500 interactions, 40 follow-ups
+```
+
+`pnpm dev` needs a Postgres 16 with `pgvector` and `pg_trgm`. It starts one in Docker if Docker is
+there, and otherwise prints the two other ways to get one (Postgres.app, Homebrew) rather than
+installing anything itself. The API documents itself at `/api/docs`.
+
+`pnpm verify` is what CI runs. Screenshots and a roadmap land here as the interface is built.
 
 ## Built with
 
