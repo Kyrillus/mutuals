@@ -1,0 +1,52 @@
+{
+  "name": "mutuals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The personal people CRM for the agentic era",
+  "license": "MIT",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": "11.25.0"
+  },
+  "devEngines": {
+    "runtime": { "name": "node", "version": ">=24.0.0", "onFail": "error" },
+    "packageManager": { "name": "pnpm", "version": "11.25.0", "onFail": "error" }
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "db:up": "node scripts/db-up.mjs",
+    "db:migrate": "node --env-file-if-exists=.env packages/db/src/bin/migrate.ts up",
+    "db:reproject": "node --env-file-if-exists=.env packages/db/src/bin/reproject.ts",
+    "db:check": "node --env-file-if-exists=.env packages/db/src/bin/check.ts",
+    "seed": "node --env-file-if-exists=.env packages/db/src/bin/seed.ts",
+    "build": "pnpm --filter @mutuals/api build",
+    "start": "node --env-file-if-exists=.env apps/api/dist/main.js",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "lint": "eslint .",
+    "typecheck": "tsc -b --noEmit tsconfig.json && pnpm -r exec tsc --noEmit",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:watch": "vitest",
+    "openapi": "node --env-file-if-exists=.env apps/api/src/bin/emit-openapi.ts",
+    "verify:static": "pnpm format && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm build",
+    "verify:db": "pnpm db:migrate && pnpm test:integration && pnpm seed -- --assert-counts",
+    "verify": "pnpm verify:static && pnpm verify:db"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@faker-js/faker": "10.5.0",
+    "@types/node": "24.13.3",
+    "@vitest/coverage-v8": "4.1.11",
+    "esbuild": "0.28.2",
+    "eslint": "10.9.1",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.12.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.69.0",
+    "vitest": "4.1.11"
+  }
+}

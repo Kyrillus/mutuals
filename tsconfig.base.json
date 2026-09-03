@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Node strips types rather than compiling them, so nothing non-erasable is allowed:
+    // no `enum`, no parameter properties. Written this way from day one (ADR-003/008).
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+
+    // Already written to TypeScript 7's constraints, so the eventual bump is an empty
+    // diff: no baseUrl, no target: es5, `types` always listed explicitly.
+    "stableTypeOrdering": true,
+
+    "target": "es2023",
+    "lib": ["es2023"],
+    "skipLibCheck": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}

@@ -1,0 +1,22 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'e2e'
+
+# Exact pins everywhere (ADR-004). Dependabot keeps them moving; a range would
+# make "it worked yesterday" unreproducible.
+savePrefix: ''
+dedupePeerDependents: true
+verifyDepsBeforeRun: install
+
+# pnpm 11 takes a map here; onlyBuiltDependencies and friends were removed in v11.
+allowBuilds:
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - '@rolldown/binding-android-arm64@1.2.7'
+  - '@rolldown/binding-darwin-arm64@1.2.7'
+  - '@rolldown/binding-freebsd-x64@1.2.7'
+  - '@rolldown/binding-linux-ppc64-gnu@1.2.7'
+  - '@rolldown/binding-linux-x64-gnu@1.2.7'
+  - '@rolldown/binding-openharmony-arm64@1.2.7'

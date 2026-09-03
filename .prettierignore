@@ -1,0 +1,8 @@
+docs/refs/
+docs/adr-archive/
+fixtures/
+packages/db/migrations/*.sql
+docs/openapi.json
+pnpm-lock.yaml
+dist/
+coverage/

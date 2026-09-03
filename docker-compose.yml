@@ -1,0 +1,25 @@
+# The database only (ADR-012). The apps run on the host so `pnpm dev` stays a
+# normal Node dev loop with working watch mode and debugger attach.
+#
+# Postgres 16 exactly as the brief fixes it (ADR-002). 17 and 18 also work --
+# the schema uses no feature above 15 -- which is what the Postgres.app and
+# Homebrew fallbacks in the README provide.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: mutuals-db
+    environment:
+      POSTGRES_USER: mutuals
+      POSTGRES_PASSWORD: mutuals
+      POSTGRES_DB: mutuals_dev
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - mutuals-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mutuals -d mutuals_dev']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  mutuals-pgdata:

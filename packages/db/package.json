@@ -1,0 +1,19 @@
+{
+  "name": "@mutuals/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Schema, migrations, the filter-to-SQL compiler and every repository.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./test-support": "./src/test-support/index.ts"
+  },
+  "dependencies": {
+    "@mutuals/core": "workspace:*",
+    "kysely": "0.29.5",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  }
+}

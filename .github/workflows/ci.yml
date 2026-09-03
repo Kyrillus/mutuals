@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'version/**', 'stage-**']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: Format, lint, typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify:static
+
+  database:
+    name: Migrations, integration tests, seed
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: mutuals
+          POSTGRES_PASSWORD: mutuals
+          POSTGRES_DB: mutuals_dev
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U mutuals -d mutuals_dev"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      DATABASE_URL: postgres://mutuals:mutuals@localhost:5432/mutuals_dev
+      TEST_DATABASE_URL: postgres://mutuals:mutuals@localhost:5432/mutuals_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+      - run: pnpm install --frozen-lockfile
+      - name: Create the test database
+        run: PGPASSWORD=mutuals psql -h localhost -U mutuals -d mutuals_dev -c 'CREATE DATABASE mutuals_test'
+      - run: pnpm verify:db
