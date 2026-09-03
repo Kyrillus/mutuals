@@ -1,42 +1,32 @@
 # Dependencies
 node_modules/
-.pnp
-.pnp.*
 
-# Next.js
-.next/
-out/
-next-env.d.ts
-
-# Build-Output
+# Build output
 dist/
-build/
 *.tsbuildinfo
 
-# Datenbank (lokal, nie im Repo)
-data/
-*.db
-*.db-wal
-*.db-shm
-*.sqlite
-*.sqlite3
-
-# Secrets
+# Secrets — .env.example is committed, real values never are
 .env
 .env.*
 !.env.example
 
 # Tests
 coverage/
-.vitest/
+test-results/
+playwright-report/
+.playwright/
+
+# Local database volume
+.pgdata/
+
+# Legacy prototype data (lives on `main`; never part of this branch)
+data/
 
 # Logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# OS / Editor
+# OS / editor
 .DS_Store
 Thumbs.db
 .idea/
