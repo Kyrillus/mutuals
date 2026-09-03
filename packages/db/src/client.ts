@@ -33,7 +33,7 @@ const PLANNER_OPTIONS = Object.entries(PLANNER_SETTINGS)
   .map(([name, value]) => `-c ${name}=${value}`)
   .join(' ')
 
-const DATE_OID = 1082
+const DATE_OID = pg.types.builtins.DATE
 
 /**
  * A `date` is a calendar day with no zone, which is what `CivilDate` is. node-pg's default parser
@@ -42,8 +42,13 @@ const DATE_OID = 1082
  * the domain wrote.
  */
 const TYPE_PARSERS: CustomTypesConfig = {
+  // The two assertions are @types/pg's gaps, not ours: `getTypeParser` is declared as returning
+  // `any`, and the `format` it accepts is a different enum object from the one this callback is
+  // handed. Both are localised here so the rest of the package keeps its strict typing.
   getTypeParser: (oid, format) =>
-    oid === DATE_OID ? (value: string) => value : pg.types.getTypeParser(oid, format),
+    oid === DATE_OID
+      ? (value: string) => value
+      : (pg.types.getTypeParser(oid, format) as (value: string) => unknown),
 }
 
 export interface DbOptions {

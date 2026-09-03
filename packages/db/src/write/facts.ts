@@ -133,15 +133,15 @@ type FactSlots = Partial<Insertable<DB['fact']>>
 function slotColumns(value: SlotValue): FactSlots {
   switch (value.kind) {
     case 'text':
-      return { [valueColumn('text')]: value.text } as FactSlots
+      return { [valueColumn('text')]: value.text }
     case 'number':
-      return { [valueColumn('number')]: value.num } as FactSlots
+      return { [valueColumn('number')]: value.num }
     case 'date':
-      return { [valueColumn('date')]: value.date } as FactSlots
+      return { [valueColumn('date')]: value.date }
     case 'bool':
-      return { [valueColumn('bool')]: value.bool } as FactSlots
+      return { [valueColumn('bool')]: value.bool }
     case 'option':
-      return { [valueColumn('option')]: value.optionId } as FactSlots
+      return { [valueColumn('option')]: value.optionId }
     case 'relation':
       return {
         [valueColumn('relation')]: value.targetRecordId,
@@ -149,7 +149,7 @@ function slotColumns(value: SlotValue): FactSlots {
         link_from: value.link?.from ?? null,
         link_to: value.link?.to ?? null,
         link_is_primary: value.link?.isPrimary ?? null,
-      } as FactSlots
+      }
   }
 }
 

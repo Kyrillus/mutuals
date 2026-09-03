@@ -1,0 +1,97 @@
+/**
+ * Every operation the API offers, by name (ADR-031).
+ *
+ * §7 asks that "every operation the UI performs is a single, well-named API operation, not a
+ * sequence of UI-only calls" — the sentence the MCP-adapter claim rests on. CI cannot prove that:
+ * no check can see a UI action that has no operation. So the *list* is the reviewable artifact, and
+ * `operations.test.ts` proves the two things a machine can: every registered route appears here,
+ * and every name here is registered. A route added without a name, or a name left behind by a
+ * deleted route, fails the build.
+ *
+ * {@link PLANNED_OPERATIONS} holds the names ADR-031 enumerates that later stages will register.
+ * They are written down rather than remembered, and the test asserts the two lists are disjoint —
+ * so the day the import wizard lands, `createImportBatch` moves from one array to the other and
+ * cannot quietly be invented under a second name.
+ */
+
+export const OPERATIONS = [
+  // -- Contacts (§6.2, §6.5) --------------------------------------------------------------------
+  'listContacts',
+  'getContact',
+  'createContact',
+  'updateContact',
+  'deleteContact',
+  'bulkDeleteContacts',
+  'bulkUpdateContactAttribute',
+  'getContactConnections',
+
+  // -- Organizations (§6.3) ---------------------------------------------------------------------
+  'listOrganizations',
+  'getOrganization',
+  'createOrganization',
+  'updateOrganization',
+  'deleteOrganization',
+
+  // -- Interactions (§6.5) ----------------------------------------------------------------------
+  'listInteractions',
+  'createInteraction',
+  'updateInteraction',
+  'deleteInteraction',
+
+  // -- Follow-ups (§6.4) ------------------------------------------------------------------------
+  'listFollowUps',
+  'createFollowUp',
+  'updateFollowUp',
+  'deleteFollowUp',
+  'bulkUpdateFollowUps',
+
+  // -- Attribute definitions (§6.7) -------------------------------------------------------------
+  'listAttributeDefinitions',
+  'createAttributeDefinition',
+  'updateAttributeDefinition',
+  'deleteAttributeDefinition',
+  'previewDeleteAttributeDefinition',
+
+  // -- Dashboard and settings (§6.1, §6.6) ------------------------------------------------------
+  'getStats',
+  'getProfile',
+  'updateProfile',
+
+  // -- Stage 6: registered, documented, and answering 501 (§4.8) --------------------------------
+  'search',
+  'ask',
+  'quickCapture',
+] as const
+
+export type OperationId = (typeof OPERATIONS)[number]
+
+/**
+ * ADR-031's remaining names, kept here so the complete surface stays reviewable while the routes
+ * that implement them do not exist yet.
+ *
+ * - Saved views arrive with Stage 4, the dashboard stage.
+ * - The import wizard and merge arrive with Stage 5.
+ */
+export const PLANNED_OPERATIONS = [
+  'mergeContacts',
+  'previewMergeContacts',
+  'mergeOrganizations',
+
+  'listViews',
+  'createView',
+  'updateView',
+  'deleteView',
+
+  'createImportBatch',
+  'getImportBatch',
+  'updateImportRow',
+  'revertImportRow',
+  'replaceInImportBatch',
+  'exportImportBatch',
+  'commitImportBatch',
+  'getImportErrorReport',
+] as const
+
+export type PlannedOperationId = (typeof PLANNED_OPERATIONS)[number]
+
+export const OPERATION_SET: ReadonlySet<string> = new Set<string>(OPERATIONS)

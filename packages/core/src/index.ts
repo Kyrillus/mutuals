@@ -42,6 +42,10 @@ export * from './identity/website.ts'
 export * from './followups/recurrence.ts'
 export * from './followups/state.ts'
 
+// The API contract. Request and response schemas live here, not in `apps/api`, because the
+// frontend imports them instead of generating a client (ADR-030).
+export * from './contracts/index.ts'
+
 export * from './decimal.ts'
 export * from './result.ts'
 export * from './text/casefold.ts'

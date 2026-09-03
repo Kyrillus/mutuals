@@ -242,7 +242,11 @@ export async function createAttributeDefinition(
   exec: Executor,
   input: AttributeDefinitionDraftInput,
 ): Promise<AttributeDefinition> {
-  if (!isAttributeType(input.type)) throw new WriteError(`unknown attribute type ${input.type}`)
+  // The parameter is typed, but this function is also the landing point for JSON off the wire,
+  // so the guard is real. `input.type` narrows to `never` in this branch, hence the widening.
+  if (!isAttributeType(input.type)) {
+    throw new WriteError(`unknown attribute type ${String(input.type)}`)
+  }
 
   return exec.transaction().execute(async (trx) => {
     const workspaceId = await resolveWorkspaceId(trx, input.workspaceId)

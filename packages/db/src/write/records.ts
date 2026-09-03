@@ -12,7 +12,21 @@ import type { Executor, Provenance } from './types.ts'
 import { WriteError } from './types.ts'
 import { resolveWorkspaceId } from './workspace.ts'
 import type { CreatedVia, DB, ObjectType } from '../schema.ts'
-import type { Insertable } from 'kysely'
+import { sql, type Insertable } from 'kysely'
+
+/**
+ * `search_document` is derived from `record.display_label` and from `interaction.body`, and neither
+ * of those is a fact — so the `AFTER STATEMENT` trigger on `fact`, which is what normally keeps the
+ * projection current, never fires for them. Without this call a contact created with no attribute
+ * values has no search document at all, and renaming one leaves the old name in the index. Found by
+ * the projection-equivalence gate: a rebuild produced a row that the incremental path never wrote.
+ *
+ * It is called on every create and on every write that can change a label or a body. The projector
+ * is idempotent, so the second call for a record that also wrote values is a no-op upsert.
+ */
+async function refreshProjection(exec: Executor, recordId: Uuid): Promise<void> {
+  await sql`select project_record(${recordId}, null)`.execute(exec)
+}
 
 export interface RecordProvenanceInput {
   readonly workspaceId?: string | null
@@ -99,6 +113,7 @@ export async function createContact(exec: Executor, input: ContactInput): Promis
       .onConflict((conflict) => conflict.doNothing())
       .execute()
 
+    await refreshProjection(trx, id)
     await writeInitialValues(trx, id, input.values, input.provenance)
     return id
   })
@@ -123,12 +138,16 @@ export async function updateContact(
     ...(patch.notImportant === undefined ? {} : { not_important: patch.notImportant }),
   }
   if (Object.keys(columns).length === 0) return false
-  const result = await exec
-    .updateTable('contact')
-    .set(columns)
-    .where('id', '=', id)
-    .executeTakeFirst()
-  return Number(result.numUpdatedRows) > 0
+  return inTransaction(exec, async (trx) => {
+    const result = await trx
+      .updateTable('contact')
+      .set(columns)
+      .where('id', '=', id)
+      .executeTakeFirst()
+    if (Number(result.numUpdatedRows) === 0) return false
+    await refreshProjection(trx, id)
+    return true
+  })
 }
 
 export async function createOrganization(exec: Executor, input: OrganizationInput): Promise<Uuid> {
@@ -143,18 +162,25 @@ export async function createOrganization(exec: Executor, input: OrganizationInpu
       })
       .onConflict((conflict) => conflict.doNothing())
       .execute()
+    await refreshProjection(trx, id)
     await writeInitialValues(trx, id, input.values, input.provenance)
     return id
   })
 }
 
 export async function renameOrganization(exec: Executor, id: Uuid, name: string): Promise<boolean> {
-  const result = await exec
-    .updateTable('organization')
-    .set({ name })
-    .where('id', '=', id)
-    .executeTakeFirst()
-  return Number(result.numUpdatedRows) > 0
+  return inTransaction(exec, async (trx) => {
+    const result = await trx
+      .updateTable('organization')
+      .set({ name })
+      .where('id', '=', id)
+      .executeTakeFirst()
+    if (Number(result.numUpdatedRows) === 0) return false
+    // The name is the label, the label is the search document's title, and a rename that left the
+    // old one in the index would make the palette answer with a name nobody uses any more.
+    await refreshProjection(trx, id)
+    return true
+  })
 }
 
 export async function createInteraction(exec: Executor, input: InteractionInput): Promise<Uuid> {
@@ -172,6 +198,7 @@ export async function createInteraction(exec: Executor, input: InteractionInput)
       })
       .execute()
     await setParticipants(trx, id, input.contactIds ?? [], input.organizationIds ?? [])
+    await refreshProjection(trx, id)
     await writeInitialValues(trx, id, input.values, input.provenance)
     return id
   })
@@ -213,6 +240,7 @@ export async function updateInteraction(
       await trx.updateTable('record').set({ updated_at: new Date() }).where('id', '=', id).execute()
       touched = true
     }
+    if (touched) await refreshProjection(trx, id)
     return touched
   })
 }
