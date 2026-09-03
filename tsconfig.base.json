@@ -12,6 +12,10 @@
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
 
+    // Node strips types, it does not remap `./y.js` to `./y.ts`, so relative imports are written
+    // with the real extension. Nothing emits, so there is no output path to rewrite.
+    "allowImportingTsExtensions": true,
+
     // Already written to TypeScript 7's constraints, so the eventual bump is an empty
     // diff: no baseUrl, no target: es5, `types` always listed explicitly.
     "stableTypeOrdering": true,

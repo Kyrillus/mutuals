@@ -45,8 +45,15 @@ export default defineConfig({
       // against a Fastify plugin and gets gamed the day it is introduced.
       thresholds: {
         perFile: true,
-        'packages/core/src/{attributes,filters,sort,warmth,identity,followups,import,text,time,decimal}/**':
-          { lines: 90, branches: 85, functions: 100 },
+        'packages/core/src/{attributes,fields,filters,identity,followups,import,text,time}/**': {
+          lines: 90,
+          branches: 85,
+          functions: 100,
+        },
+        // warmth and decimal are files, not directories. Written as a second
+        // group because the directory glob above silently matches neither, and
+        // warmth is one of the modules the brief names by hand in section 8.1.
+        'packages/core/src/{warmth,decimal}.ts': { lines: 90, branches: 85, functions: 100 },
       },
     },
   },

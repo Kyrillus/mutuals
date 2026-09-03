@@ -34,7 +34,9 @@ function die(message, ...detail) {
 const envPath = join(root, '.env')
 if (!existsSync(envPath)) {
   copyFileSync(join(root, '.env.example'), envPath)
-  console.log(`${green('✓')} Created ${bold('.env')} from .env.example. Defaults are fine to start.`)
+  console.log(
+    `${green('✓')} Created ${bold('.env')} from .env.example. Defaults are fine to start.`,
+  )
 }
 process.loadEnvFile(envPath)
 
@@ -74,8 +76,8 @@ const canConnect = (h, p, timeout = 1500) =>
   })
 
 const has = (cmd) =>
-  spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { stdio: 'ignore' })
-    .status === 0
+  spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { stdio: 'ignore' }).status ===
+  0
 
 if (!(await canConnect(host, port))) {
   if (!isLocal) {
@@ -89,7 +91,10 @@ if (!(await canConnect(host, port))) {
   console.log(`${dim('…')} Nothing is listening on ${host}:${port}. Starting one.`)
 
   if (has('docker')) {
-    const up = spawnSync('docker', ['compose', 'up', '-d', '--wait'], { cwd: root, stdio: 'inherit' })
+    const up = spawnSync('docker', ['compose', 'up', '-d', '--wait'], {
+      cwd: root,
+      stdio: 'inherit',
+    })
     if (up.status !== 0) die('`docker compose up` failed.', 'Is Docker Desktop running?')
     console.log(`${green('✓')} Database container is up.`)
   } else {

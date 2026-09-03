@@ -58,25 +58,25 @@ module, then testing and CI.
 The reviews found nine defects that would have shipped, plus a long list of Phase-1 over-engineering.
 The material reversals:
 
-| # | Was proposed | Now | Why |
-|---|---|---|---|
-| 1 | Text normalisation implemented **twice** — a TypeScript fold and Postgres `unaccent` — with a contract test pinning them together | **One implementation, in SQL** (`mutuals_norm()`); TypeScript never produces a value compared against a normalised column | The contract test provably cannot pass (`'İstanbul'.toLowerCase()` ≠ PG `lower()`; `ß`→`ss` only in `unaccent`; ligature expansion). Deleting the second implementation deletes the test and the drift. |
-| 2 | `fact.text_norm` / `fact.text_sort` written into the append-only truth log | Derived text columns live **only** on `attribute_value` | A truth log must not carry values only the application can recompute; `db:reproject` could not repair them. |
-| 3 | Frontend types generated from `openapi.json` via `openapi-typescript` → `openapi-fetch` → `openapi-react-query`; TypeScript pinned to 5.9.3 | Frontend imports Zod-inferred types from `@mutuals/core`; **TypeScript 6.0.3**; `openapi.json` still emitted and committed for `/api/docs`, MCP and Python | The codegen chain existed only to serve the frontend, which sits in the same monorepo. Removing it drops 3 dependencies, 2 CI gates, a committed `schema.d.ts`, `openapi-fetch`'s error-type lie, and the `typescript ^5.x` peer that was pinning the whole repo one major behind. |
-| 4 | `packages/ui` with shadcn's monorepo layout on Tailwind 4 | shadcn components copied into `apps/web/src/components/ui` | There is exactly one frontend. The proposed `@source` wiring was broken (Tailwind 4 auto-detection is cwd-relative; `packages/ui/src` would never have been scanned, so the component library would have rendered unstyled). One consumer, one home, problem gone. |
-| 5 | Filter compiler in `packages/core` emitting SQL text (one ADR) **and** returning Kysely expressions (another ADR) | Filter **model, operator table and relative-date resolution** in `packages/core`; **compiler** in `packages/db` | `packages/core` ships to the browser and may not import a query builder. Kysely's `.compile()` is pure, so the golden-SQL tests still need no database and still prove the real SQL. |
-| 6 | `kysely-codegen` generating `DB` from the live database, with `--camel-case`, as a CI gate | `DB` hand-maintained in `packages/db/src/schema.ts` (bootstrapped once by `kysely-codegen`), snake_case, guarded by an **`information_schema` drift test** | `kysely-codegen@0.20.0` has never shipped a release tested against `kysely@0.29.x` (its devDependency is `kysely ^0.28.11`, 0.29 landed three months later) and `--camel-case` renames every identifier the compiler and the `.sql` files use. "Drift is impossible by construction" becomes the honest "drift fails a test". |
-| 7 | Warmth `k = 0.13273534` | **`k = 0.13273229`** | Recomputed: `Σ(n=0..12) e^(−n/3) = 3.48142954787`, signal `= 10.4442886436`, `k = ln4/signal = 0.132732291152`. Two named CI assertions were red on day one. No published warmth value changes. |
-| 8 | Node type stripping used in **production** too (`node src/main.ts`) | Type stripping in **development only**; production runs a single esbuild bundle | Verified failure: Node refuses to strip types from any file whose real path is inside `node_modules`, which is exactly what `pnpm deploy` produces. The API would have crashed at boot the first time anyone packaged it. |
-| 9 | LLM daily budget checked once per task; transport retried timeouts | Budget checked **before every HTTP POST**; transport carries an **overall deadline** | One task could bill six generations past the cap, and `LLM_TIMEOUT_MS=60000` could hang a user-facing request for over three minutes. |
+| #   | Was proposed                                                                                                                                | Now                                                                                                                                                        | Why                                                                                                                                                                                                                                                                                                                           |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Text normalisation implemented **twice** — a TypeScript fold and Postgres `unaccent` — with a contract test pinning them together           | **One implementation, in SQL** (`mutuals_norm()`); TypeScript never produces a value compared against a normalised column                                  | The contract test provably cannot pass (`'İstanbul'.toLowerCase()` ≠ PG `lower()`; `ß`→`ss` only in `unaccent`; ligature expansion). Deleting the second implementation deletes the test and the drift.                                                                                                                       |
+| 2   | `fact.text_norm` / `fact.text_sort` written into the append-only truth log                                                                  | Derived text columns live **only** on `attribute_value`                                                                                                    | A truth log must not carry values only the application can recompute; `db:reproject` could not repair them.                                                                                                                                                                                                                   |
+| 3   | Frontend types generated from `openapi.json` via `openapi-typescript` → `openapi-fetch` → `openapi-react-query`; TypeScript pinned to 5.9.3 | Frontend imports Zod-inferred types from `@mutuals/core`; **TypeScript 6.0.3**; `openapi.json` still emitted and committed for `/api/docs`, MCP and Python | The codegen chain existed only to serve the frontend, which sits in the same monorepo. Removing it drops 3 dependencies, 2 CI gates, a committed `schema.d.ts`, `openapi-fetch`'s error-type lie, and the `typescript ^5.x` peer that was pinning the whole repo one major behind.                                            |
+| 4   | `packages/ui` with shadcn's monorepo layout on Tailwind 4                                                                                   | shadcn components copied into `apps/web/src/components/ui`                                                                                                 | There is exactly one frontend. The proposed `@source` wiring was broken (Tailwind 4 auto-detection is cwd-relative; `packages/ui/src` would never have been scanned, so the component library would have rendered unstyled). One consumer, one home, problem gone.                                                            |
+| 5   | Filter compiler in `packages/core` emitting SQL text (one ADR) **and** returning Kysely expressions (another ADR)                           | Filter **model, operator table and relative-date resolution** in `packages/core`; **compiler** in `packages/db`                                            | `packages/core` ships to the browser and may not import a query builder. Kysely's `.compile()` is pure, so the golden-SQL tests still need no database and still prove the real SQL.                                                                                                                                          |
+| 6   | `kysely-codegen` generating `DB` from the live database, with `--camel-case`, as a CI gate                                                  | `DB` hand-maintained in `packages/db/src/schema.ts` (bootstrapped once by `kysely-codegen`), snake_case, guarded by an **`information_schema` drift test** | `kysely-codegen@0.20.0` has never shipped a release tested against `kysely@0.29.x` (its devDependency is `kysely ^0.28.11`, 0.29 landed three months later) and `--camel-case` renames every identifier the compiler and the `.sql` files use. "Drift is impossible by construction" becomes the honest "drift fails a test". |
+| 7   | Warmth `k = 0.13273534`                                                                                                                     | **`k = 0.13273229`**                                                                                                                                       | Recomputed: `Σ(n=0..12) e^(−n/3) = 3.48142954787`, signal `= 10.4442886436`, `k = ln4/signal = 0.132732291152`. Two named CI assertions were red on day one. No published warmth value changes.                                                                                                                               |
+| 8   | Node type stripping used in **production** too (`node src/main.ts`)                                                                         | Type stripping in **development only**; production runs a single esbuild bundle                                                                            | Verified failure: Node refuses to strip types from any file whose real path is inside `node_modules`, which is exactly what `pnpm deploy` produces. The API would have crashed at boot the first time anyone packaged it.                                                                                                     |
+| 9   | LLM daily budget checked once per task; transport retried timeouts                                                                          | Budget checked **before every HTTP POST**; transport carries an **overall deadline**                                                                       | One task could bill six generations past the cap, and `LLM_TIMEOUT_MS=60000` could hang a user-facing request for over three minutes.                                                                                                                                                                                         |
 
 Two reviewer objections were **not** accepted, and why:
 
-- *"The `Straßburg` bug motivates a TypeScript-only fold."* It does not exist: the proposed fold table
+- _"The `Straßburg` bug motivates a TypeScript-only fold."_ It does not exist: the proposed fold table
   already contains `ß→ss`, `æ→ae`, `ø→o`, `ł→l`, so it agrees with `unaccent` on all three headline
   cases. Real divergence is confined to compatibility characters (`ĳ`, `ﬁ`, `Ⅷ`, `½`). That is a drift
   argument, and the answer to drift is one implementation, not two plus a test.
-- *"Force the cluster to `lc_ctype=C` so `lower()` is predictable."* Rejected. That is a
+- _"Force the cluster to `lc_ctype=C` so `lower()` is predictable."_ Rejected. That is a
   product-visible decision about how German names case-fold, buried in a testing ADR. The cluster keeps
   the host default; determinism comes from `text_sort text COLLATE "C"` at the **column** level, which
   `storage-DECISION` already had right.
@@ -279,6 +279,7 @@ reason the whole TypeScript version decision (ADR-003) was taken, so giving it u
 would be incoherent.
 
 **Consequences — three fixes to the proposed config, each verified as a real failure:**
+
 1. `scripts/**/*.mjs` is linted with `js.configs.recommended` only, **outside** the
    `recommendedTypeChecked` block. With `projectService: true` and the file excluded from every
    tsconfig, `eslint .` fails on the first run with "was not found by the project service".
@@ -326,8 +327,9 @@ cannot, print instructions a non-developer can follow.
 option 3 fails §12.
 
 **Consequences — four fixes to the proposed script:**
-- `new URL(process.env.DATABASE_URL)` is inside a `try/catch` that prints *"DATABASE_URL could not be
-  parsed — if your password contains `@ : / #`, percent-encode it"* with a worked example. Verified:
+
+- `new URL(process.env.DATABASE_URL)` is inside a `try/catch` that prints _"DATABASE_URL could not be
+  parsed — if your password contains `@ : / #`, percent-encode it"_ with a worked example. Verified:
   a Supabase-style password containing `/` throws `ERR_INVALID_URL`, and `.env.example` tells the
   user to paste exactly such a string.
 - When the host is not `localhost`/`127.0.0.1`, an unreachable database prints a connectivity hint,
@@ -427,7 +429,7 @@ subtypes. (2) Nullable FK pairs plus CHECKs on five tables. (3) No referential i
 **Consequences.** One hash join on every list query, against a permanently cached table, and one
 extra `INSERT` on create. In exchange, five polymorphic tables get real `ON DELETE CASCADE`, the
 `relation` attribute type has one FK target, provenance has one home, and §4.1's "model interactions
-so custom attributes would be a small change" becomes *literally* small: adding custom attributes to
+so custom attributes would be a small change" becomes _literally_ small: adding custom attributes to
 interactions is inserting `attribute_definition` rows and nothing else.
 
 ### ADR-016 — Hard delete, not soft delete
@@ -453,6 +455,7 @@ renders the old label.
 **Options.** Notion's conventions, or Airtable's. They disagree with each other on all three, so there is no de-facto standard to defer to and each has to be settled on how a person reads the chip.
 
 **Choice.**
+
 - **`is empty` means "no live value row exists"**, for all twelve types, compiled as one `NOT EXISTS`
   over `av_attr_rec_idx`. `CHECK (text_value <> '')` on both `fact` and `attribute_value` makes
   "empty string" and "no value" incapable of diverging at any write site.
@@ -481,12 +484,12 @@ always, plus an `is_multi` predicate everywhere cardinality matters.
 **Choice.** Option 1, written down once as the derivation table and computed in the write path from
 `is_multi` alone:
 
-| cardinality / type | `value_key` |
-|---|---|
-| any single-valued attribute | `''` |
-| `tags` | `left(mutuals_norm(text_value), 512)` |
-| `multi_select` | the option's stable `key` |
-| `relation` | not applicable — identity is `record_link (from_record_id, attribute_id, to_record_id)` |
+| cardinality / type          | `value_key`                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| any single-valued attribute | `''`                                                                                    |
+| `tags`                      | `left(mutuals_norm(text_value), 512)`                                                   |
+| `multi_select`              | the option's stable `key`                                                               |
+| `relation`                  | not applicable — identity is `record_link (from_record_id, attribute_id, to_record_id)` |
 
 **Consequences.** The `valueKey()` helper in `packages/core` is **deleted**; nothing outside the write
 path computes this value. One correction to the review that raised it: the failure it predicted — a
@@ -502,7 +505,7 @@ element writes the normalised key and is matched by `contains any of`.
 ### ADR-019 — Text normalisation has exactly one implementation, and it is SQL
 
 **Context.** This is the change with the widest blast radius. The proposals had a TypeScript fold
-(`packages/core/src/text/normalize.ts`) *and* Postgres `unaccent`, pinned together by a "highest-value
+(`packages/core/src/text/normalize.ts`) _and_ Postgres `unaccent`, pinned together by a "highest-value
 test in the suite". That test cannot pass: verified, `'İstanbul'.toLowerCase()` is `i̇stanbul`
 (i + U+0307) where Postgres gives `istanbul`; `unaccent` maps `ß→ss` and expands `ﬁ`, `ĳ`, `Ⅷ`;
 `pg_trgm`'s word-character test is locale-dependent. Making them agree means hand-porting
@@ -539,7 +542,7 @@ and the 100-pair contract test are all **deleted** — one algorithm fewer to ma
 class of silent divergence gone. `mutuals_norm` is only ever called in `INSERT`/`UPDATE`/`WHERE`,
 **never inside an index definition**, so it does not need to be `IMMUTABLE` and the whole
 "`unaccent` is STABLE" problem evaporates — as does the need for `contact.name_key`, since
-`record.label_norm` is a written column with its own trigram GIN. `packages/core` keeps a *display*
+`record.label_norm` is a written column with its own trigram GIN. `packages/core` keeps a _display_
 casefold for UI conveniences (deduplicating tag suggestions as you type); it is documented as
 **not** the filter contract and nothing asserts the two agree. If `unaccent` is unavailable on a
 target Postgres, `mutuals_norm` becomes `lower(btrim($1))`: one line, then `pnpm db:reproject`. Only
@@ -556,7 +559,7 @@ comes from `text_sort text COLLATE "C"` at the column level, not from a cluster-
 
 **Consequences.** `pnpm db:reproject` can rebuild every derived value from `fact` alone — which is
 the entire safety argument for keeping a projection. A `CHECK` on a derived column in an append-only
-log could only ever assert `NOT NULL`; it could never assert *correct*, so a hand-written or
+log could only ever assert `NOT NULL`; it could never assert _correct_, so a hand-written or
 mis-versioned `INSERT INTO fact` would have produced a permanently wrong row that no rebuild
 could repair.
 
@@ -568,7 +571,7 @@ resolution.
 **Options.** (1) Bitemporal resolution, with currency ordered by `valid_from`. (2) Unconditional supersession, with `valid_from` stored and displayed but never ordering currency.
 
 **Choice.** Supersession in the write path is unconditional: the newest write wins. `valid_from` is
-stored, indexed and shown in the history popover ("Company: Stripe — *since Jun 2025*, from LinkedIn
+stored, indexed and shown in the history popover ("Company: Stripe — _since Jun 2025_, from LinkedIn
 import") but never orders currency.
 
 **Consequences.** Said explicitly because a half-implemented bitemporal rule is worse than none: an
@@ -615,7 +618,7 @@ row, so `LIMIT 50` short-circuits nothing. `meta.total` is an **exact nullable i
 filter signature for the duration of a view.
 
 **Consequences.** Option 3 is dropped as over-engineering: at a few thousand contacts a narrow count
-is sub-millisecond, and "Rows: ~2,200" is *worse* UX than the truth. Because `total` is already
+is sub-millisecond, and "Rows: ~2,200" is _worse_ UX than the truth. Because `total` is already
 nullable, an estimate can arrive later with no API change. The list cursor is **opaque**, so today's
 `LIMIT/OFFSET` for custom-attribute sorts becomes keyset later with no API or UI change. The proposed
 `(filter, sort)` signature hash inside the cursor and the `stale_cursor` 400 are dropped — they guard
@@ -628,6 +631,7 @@ a bug unreachable in a single-user app whose only client always sends the filter
 **Options.** (1) Ship as proposed and fix whatever the equivalence gate catches. (2) Fix both defects in the migration before the gate is written.
 
 **Choice.**
+
 1. The three `string_agg` calls that build `search_document.body` get an explicit `ORDER BY`. Without
    one, the body text — and therefore the generated `tsvector` — is not a function of the data, and
    `db:reproject` can produce a different (equally valid) string, breaking the equivalence gate for
@@ -715,7 +719,7 @@ a convenience for writing new tables; it is never a gate.
 ### ADR-028 — Plain numbered `.sql` migrations, run explicitly, checked on boot
 
 **Context.** §3.2: versioned, in the repo, reproducible. There is no TS schema DSL to diff against
-(ADR-027), so migration *generation* is not a requirement — migration *application* is.
+(ADR-027), so migration _generation_ is not a requirement — migration _application_ is.
 
 **Options.** (1) drizzle-kit generate/migrate. (2) Kysely's `Migrator` with a
 `SqlFileMigrationProvider` over numbered `.sql` files. (3) `node-pg-migrate`. (4) Migrate on API boot.
@@ -731,42 +735,44 @@ and refuses to serve if the database is behind.
 the mechanism that makes hand-authored SQL a first-class citizen rather than a workaround.
 
 **Consequences — three corrections.**
+
 1. Kysely's `Migrator` runs **the entire migration run in one transaction**
    (`runWithLock(db, db => db.transaction().execute(run))`), not one per migration. The safety
    conclusion is stronger, not weaker — a failure at `0007` rolls back `0005` and `0006` too — but
    anyone reasoning about partial application from the old text would have been wrong.
 2. **The `.notx.sql` escape hatch is deleted.** `Migration` in kysely 0.29.5 has only `up`/`down`;
-   `disableTransactions` is Migrator-level; and the Migrator throws *"corrupted migrations: previously
-   executed migration X is missing"* the moment a provider omits a recorded migration. A runner that
+   `disableTransactions` is Migrator-level; and the Migrator throws _"corrupted migrations: previously
+   executed migration X is missing"_ the moment a provider omits a recorded migration. A runner that
    filtered out `.notx.sql` files would throw as soon as one had been applied. Nothing in Phase 1 needs
    `CONCURRENTLY`, and ADR-013 forbids runtime DDL; if it is ever needed the honest answers are a
    second ledger table or `disableTransactions: true`, and that is one line in a future ADR.
 3. `assertSchemaCurrent()` catches Postgres error `42P01` (`kysely_migration` does not exist on a
-   genuinely fresh database) and prints *"Run: pnpm db:migrate"* instead of a relation-not-found error.
+   genuinely fresh database) and prints _"Run: pnpm db:migrate"_ instead of a relation-not-found error.
 
 ### ADR-029 — REST, OpenAPI 3.1 generated from Zod 4
 
 **Context.** §3.2 makes this the default and requires any tRPC proposal to explain how non-TypeScript
 clients still get REST. §7 requires `/api/v1`, docs at `/api/docs`, a middleware slot for a future
-bearer token, and — the sentence that actually constrains the design — *"every operation the UI
-performs must be a single, well-named API operation"*.
+bearer token, and — the sentence that actually constrains the design — _"every operation the UI
+performs must be a single, well-named API operation"_.
 
 **Options.** (1) REST + Zod + `fastify-type-provider-zod@7.0.0`. (2) tRPC 11 + `trpc-to-openapi`.
 (3) A hand-written `openapi.yaml` as the source.
 
 **Choice.** Option 1. One schema object per route feeds three consumers at once: Fastify's validator,
 Fastify's serialiser, and `@fastify/swagger`'s document generator. OpenAPI **3.1**, not 3.0, because
-3.1 *is* JSON Schema — the same dialect the LLM structured-output path and MCP tool definitions want.
+3.1 _is_ JSON Schema — the same dialect the LLM structured-output path and MCP tool definitions want.
 `@fastify/swagger-ui` serves `/api/docs`; the raw document is at `/api/v1/openapi.json` and is
 **committed** as `docs/openapi.json`, regenerated and diffed in CI.
 
 **Consequences — three corrections.**
+
 - Registering a schema in `z.globalRegistry` emits **two** components, `X` and `XInput`; v7 splits
   input/output variants. Documented, so nobody wonders why the spec doubled.
 - The contract test comparing `z.toJSONSchema(FilterSetSchema, {target:'draft-2020-12'})` to the
   emitted component must **strip `$schema`**; as written it was red on day one.
 - **No `bearerAuth` security scheme is published.** §7 asks for a middleware slot; the empty
-  `fastify-plugin` `preHandler` *is* that slot. Declaring an auth scheme no operation enforces tells
+  `fastify-plugin` `preHandler` _is_ that slot. Declaring an auth scheme no operation enforces tells
   every generated client to send credentials that are ignored.
 
 House rule: `z.toJSONSchema` is **always** called with an explicit `io` (`'input'` for query/body,
@@ -805,8 +811,9 @@ filter model, and one named operation per UI action.
 **Options.** (1) A bare object for one resource and `{data, page, meta}` for lists, with RFC 9457 errors. (2) JSON:API. (3) One uniform envelope for every response, single resources included.
 
 **Choice.**
+
 - **Single resource:** the bare object. **Lists:** `{ data: T[], page: { cursor, hasMore },
-  meta: { total } }`. `total` is an exact nullable integer.
+meta: { total } }`. `total` is an exact nullable integer.
 - **Errors:** RFC 9457 `application/problem+json` — `type`, `title`, `status`, `detail`, `instance`,
   plus `errors: [{ field, code, message }]` for validation. `type` URIs point at anchors in the
   repository's `docs/ERRORS.md` on GitHub; RFC 9457's default is `about:blank` and the URI is
@@ -824,19 +831,19 @@ contract the MCP server will consume:
 ```ts
 export const AttributeValueSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('short_text'), value: z.string() }),
-  z.object({ type: z.literal('long_text'),  value: z.string() }),
-  z.object({ type: z.literal('number'),     value: DecimalString, unit: z.string().optional() }),
-  z.object({ type: z.literal('date'),       value: CivilDate }),
-  z.object({ type: z.literal('yes_no'),     value: z.boolean() }),
-  z.object({ type: z.literal('single_select'), value: OptionRef }),          // {key,label,color}
-  z.object({ type: z.literal('multi_select'),  value: z.array(OptionRef) }),
-  z.object({ type: z.literal('tags'),       value: z.array(z.string()) }),
-  z.object({ type: z.literal('url'),        value: z.string() }),
-  z.object({ type: z.literal('email'),      value: z.string() }),
-  z.object({ type: z.literal('phone'),      value: z.string() }),            // E.164 when parseable
-  z.object({ type: z.literal('relation'),   value: z.array(RelationRef) }),  // {id,label,objectType,
-]);                                                                          //  title?,from?,to?,isPrimary?}
-export const AttributesSchema = z.record(SlugSchema, AttributeValueSchema);
+  z.object({ type: z.literal('long_text'), value: z.string() }),
+  z.object({ type: z.literal('number'), value: DecimalString, unit: z.string().optional() }),
+  z.object({ type: z.literal('date'), value: CivilDate }),
+  z.object({ type: z.literal('yes_no'), value: z.boolean() }),
+  z.object({ type: z.literal('single_select'), value: OptionRef }), // {key,label,color}
+  z.object({ type: z.literal('multi_select'), value: z.array(OptionRef) }),
+  z.object({ type: z.literal('tags'), value: z.array(z.string()) }),
+  z.object({ type: z.literal('url'), value: z.string() }),
+  z.object({ type: z.literal('email'), value: z.string() }),
+  z.object({ type: z.literal('phone'), value: z.string() }), // E.164 when parseable
+  z.object({ type: z.literal('relation'), value: z.array(RelationRef) }), // {id,label,objectType,
+]) //  title?,from?,to?,isPrimary?}
+export const AttributesSchema = z.record(SlugSchema, AttributeValueSchema)
 ```
 
 **The complete operation list (34), because CI cannot detect a missing one.** The proposed CI check
@@ -1012,16 +1019,24 @@ from `type` and exists only on the database row (where the composite FK needs it
 
 ```ts
 type AttributeDefinition = {
-  id: string; objectType: 'contact' | 'organization' | 'interaction';
-  title: string; slug: string; type: AttributeType;
-  config: AttributeConfig;                  // per-type, narrowed by configSchema
-  options?: AttributeOption[];              // present iff type is single_select | multi_select
-  group?: string; description?: string;
-  isSystem: boolean; isMulti: boolean; isDerived: boolean;
-  sortable: boolean;                        // derived from type; API 400s on a sort request otherwise
-  position: number; showByDefault: boolean;
-  createdAt: string; updatedAt: string;
-};
+  id: string
+  objectType: 'contact' | 'organization' | 'interaction'
+  title: string
+  slug: string
+  type: AttributeType
+  config: AttributeConfig // per-type, narrowed by configSchema
+  options?: AttributeOption[] // present iff type is single_select | multi_select
+  group?: string
+  description?: string
+  isSystem: boolean
+  isMulti: boolean
+  isDerived: boolean
+  sortable: boolean // derived from type; API 400s on a sort request otherwise
+  position: number
+  showByDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
 ```
 
 **Consequences.** `required` is **not** a field — §4.2 defines no such concept; required-ness in
@@ -1103,7 +1118,7 @@ follow-ups table, where they are creation and snooze affordances rather than fil
 
 **Options.** (1) Three tiers: system names, ~90 SQL keywords, hazard names. (2) Two tiers.
 
-**Choice.** Two. **Tier 1** is *derived* from `SYSTEM_FIELDS` plus the derived-field registry, so it
+**Choice.** Two. **Tier 1** is _derived_ from `SYSTEM_FIELDS` plus the derived-field registry, so it
 can never drift from the code. **Tier 2** is the genuine JS/JSON hazards only: `__proto__`,
 `constructor`, `prototype`.
 
@@ -1141,7 +1156,7 @@ named test asserts that case lands in `probable`. `emailMatchKey` (gmail dots, p
 would permanently prevent storing two deliberately distinct addresses. Website identity is host-based
 with **no public-suffix list**; `new URL('http://' + domain).hostname` is inside the `Result` wrapper
 because it throws on malformed input, with tests for a space, `a..b` and a trailing dot. A website
-scores 0.00 as identity for a *contact* (colleagues share one). Candidate generation and scoring are
+scores 0.00 as identity for a _contact_ (colleagues share one). Candidate generation and scoring are
 SQL (ADR-019); the importer **batches** identifier probes — one probe per identifier per row is 20k+
 round trips on a 10k LinkedIn export.
 
@@ -1279,6 +1294,7 @@ cache (everything fetched), component state (open dialogs, focus), and nothing e
 is rejected because it is scoped to a component that unmounts when the row scrolls out of view.
 
 **Consequences — three defects in the proposed protocol, fixed.**
+
 1. **The rollback restored only half the cache.** `onMutate` patched both the list caches and
    `qk.record(id)`, but the snapshot captured only `getQueriesData(['records', objectType])`, so after
    a failure the detail sidebar kept the failed value while the table showed the correct one — exactly
@@ -1331,6 +1347,7 @@ are written against v9, so pinning v8 would diverge from the mandated pattern.
 sorting, pagination and counting all happen in Postgres (ADR-013, ADR-032).
 
 **Consequences — two fixes.**
+
 1. **`manualFiltering` and `manualPagination` are deleted from the options literal.** v9 gates option
    types by feature: `manualFiltering` lives on `TableOptions_ColumnFiltering` and `manualPagination`
    on `TableOptions_RowPagination`, neither of which is registered, so they are excess properties and
@@ -1430,13 +1447,13 @@ apps/web/src/
   lib/  hooks/
 ```
 
-ESLint zone: *a `features/*` folder may import `ui`, `table`, `attributes`, `lib`, `hooks` and
-`@mutuals/core` — never a sibling feature.*
+ESLint zone: _a `features/*` folder may import `ui`, `table`, `attributes`, `lib`, `hooks` and
+`@mutuals/core` — never a sibling feature._
 
 **Reasoning.** The proposed rule ("cross-feature composition happens in `routes/`") would have failed
 on day one of Stage 3: `features/import/` must render `RecordTable` for the Review grid,
 `features/follow-ups/` and `features/interactions/` render it for their lists, and
-`features/records/` renders `AttributeInput` in the detail sidebar. Those are compositions *inside*
+`features/records/` renders `AttributeInput` in the detail sidebar. Those are compositions _inside_
 features; a route file cannot inject a table into the middle of a wizard step and stay thin. An
 unenforceable rule gets an `eslint-disable`, which is worse than no rule.
 
@@ -1457,13 +1474,14 @@ Type scale 13/14px with the root at 16px, so Tailwind's rem-based spacing keeps 
 **Consequences.** The chip implementation is **changed**: the proposed `@utility chip-*` is not valid
 Tailwind v4 (a functional utility must resolve its wildcard through `--value(--namespace-*)`, and the
 chip tokens were declared in `:root` rather than `@theme`, so there was no namespace to resolve), and
-`` className={`chip-${color}`} `` is a constructed class name that Tailwind's source scanner cannot
+``className={`chip-${color}`}`` is a constructed class name that Tailwind's source scanner cannot
 see, so chips would have rendered unstyled twice over. Instead a literal lookup keeps every class name
 scannable:
 
 ```ts
 const CHIP: Record<ChipColor, string> = {
-  red: 'bg-[var(--chip-red-bg)] text-[var(--chip-red-fg)]', /* …10 more… */ };
+  red: 'bg-[var(--chip-red-bg)] text-[var(--chip-red-fg)]' /* …10 more… */,
+}
 ```
 
 Same tokens, same contrast. The 22 light/dark token pairs were checked by converting oklch to sRGB and
@@ -1489,7 +1507,7 @@ importer in Stage 5.
 
 **Consequences.** Every Stage-1 integration fixture would otherwise pay `boss.start()`, a schema
 install and a timer-driven background process for one handler. **The port contract is explicit:
-`enqueue(name, payload, { tx })` must run the handler *after* the caller's transaction commits** —
+`enqueue(name, payload, { tx })` must run the handler _after_ the caller's transaction commits** —
 `InlineQueue` keeps an after-commit callback list, never running inline inside the open transaction.
 Without this the two adapters have different observable semantics and ADR-058's "swap one file"
 promise is false: an inline handler would read pre-transaction state or block on the same
@@ -1551,7 +1569,7 @@ creating what is missing and **unscheduling orphans**. A boot catch-up runs the 
 sweep as its last statement — not `min(contact_metrics.computed_at)`. With ADR-022's whole-workspace
 write-back the old probe would work, but deriving freshness from a data table couples two things that
 should not be coupled; the scalar is one column, one read, and cannot drift from the write-back set.
-(Under the *proposed* sweep, which only aggregated interactions inside 365 days, the probe would have
+(Under the _proposed_ sweep, which only aggregated interactions inside 365 days, the probe would have
 fired a full sweep on every boot forever.)
 
 ### ADR-061 — The import job: one job per batch, chunked commits, no automatic retry, no dead-letter
@@ -1565,7 +1583,7 @@ fired a full sweep on every boot forever.)
 
 **Consequences.** **The `import.failed` dead-letter queue is deleted.** Nothing registered a worker
 for it, so copies would land in `created` and be read by nothing, ever — the exact orphaned-queue
-failure ADR-060 warns about — and `deleteAfterSeconds: 0` means *never delete*, not delete
+failure ADR-060 warns about — and `deleteAfterSeconds: 0` means _never delete_, not delete
 immediately. Instead the handler's `catch` writes `import_batch.status = 'failed'` plus the error
 detail and `last_committed_row` in its own committed transaction. That row is already the state
 machine the wizard polls and the Resume button reads, and it is the only place a user-visible failure
@@ -1627,7 +1645,7 @@ neither direction (`usage.cost`, `provider.require_parameters`).
 **Choice.** ~180 lines of `fetch`. Retries on 408/429/5xx with jittered backoff.
 
 **Consequences — the timeout is fixed.** The proposal composed `AbortSignal.timeout(timeoutMs)` per
-attempt *inside* the retry loop and only rethrew on `LlmHttpError` or the caller's abort, so a timeout
+attempt _inside_ the retry loop and only rethrew on `LlmHttpError` or the caller's abort, so a timeout
 satisfied neither and a hung provider was retried three times: with the documented
 `LLM_TIMEOUT_MS=60000`, one "Ask the network" request could hang for over three minutes. Now: one
 `AbortSignal.timeout(LLM_TOTAL_TIMEOUT_MS)` is created **before** the loop and composed with the
@@ -1695,7 +1713,7 @@ loses the joins the trace exists for and does not survive `git clean`.
 with the record command when one is missing. The proposed fallback ("newest matching `llm_call` row")
 made a replay test depend on whatever database the developer happened to be pointing at — green
 locally because they clicked around last week, red in CI where the table is empty, which is the exact
-non-determinism replay exists to eliminate. And **`prompt_hash` is the prompt *template* hash**,
+non-determinism replay exists to eliminate. And **`prompt_hash` is the prompt _template_ hash**,
 identical to the `prompts.lock.json` value and constant per prompt version — not "sha256 of the
 rendered messages", which varies per input, subsumes `input_hash`, and makes the five-part key
 incoherent. The `llm.trace-prune` scheduled job, `LLM_TRACE_RETENTION_DAYS` and the whole retention
@@ -1800,8 +1818,9 @@ database) and `integration` (`packages/db`, `apps/api`; real database). A `web` 
 day the first component test is written; the `perf` project is deleted (see §9).
 
 **Consequences — two verified fixes.**
+
 1. `sequence.groupOrder` is set (`unit: 0`, `integration: 1`). Vitest 4 throws
-   *"Projects X and Y have different 'maxWorkers' but same 'sequence.groupOrder'"* when two projects
+   _"Projects X and Y have different 'maxWorkers' but same 'sequence.groupOrder'"_ when two projects
    with different resolved worker counts run in one invocation — so plain `vitest run`, `vitest --ui`
    and the proposal's own headline benefit (one coverage report across projects) all crashed.
 2. `poolOptions.forks.singleFork` **was removed in Vitest 4** and is silently ignored; the correct
@@ -1809,7 +1828,7 @@ day the first component test is written; the `perf` project is deleted (see §9)
    ran files in parallel workers against one database, which is exactly what makes
    truncate-and-reseed suites flaky.
 
-Application and pool construction move **out of `setupFiles`**, which run before *each test file* —
+Application and pool construction move **out of `setupFiles`**, which run before _each test file_ —
 so the proposed `beforeAll` booted Fastify and a `pg` pool ~30 times, not 4, and the cost model was
 built on the wrong number. They become a per-worker module-level singleton cached on `globalThis` and
 closed in `globalSetup` teardown. `packages/db` splits into `*.unit.test.ts` (in the `unit` project)
@@ -2013,75 +2032,75 @@ have no rows until the generator exists.
 Everything the reviews flagged, with the ADR that removed it. Each line is a thing that will **not** be
 built now; where §9 of the brief needs the door left open, the extension point is in §10.
 
-| Removed | Where it went | ADR |
-|---|---|---|
-| `?count=auto\|exact\|none`, `reltuples` estimation, `meta.totalIsEstimate` | `meta.total` is an exact nullable integer; an estimate is additive later | 022 |
-| Cursor `(filter, sort)` signature hash and the `stale_cursor` 400 | The cursor stays opaque | 022 |
-| `.notx.sql` reserved migration suffix | Deleted; Kysely's Migrator structurally cannot honour it | 027 |
-| Three of four generated-artifact CI gates; committed `schema.d.ts` | One gate: `docs/openapi.json` | 029, 080 |
-| A published `bearerAuth` security scheme nothing enforces | The empty `preHandler` plugin is §7's middleware slot | 028 |
-| "Where should error `type` URIs point?" as a human question | GitHub docs anchors; RFC 9457 does not require dereferencing | 030 |
-| `openapi-typescript` + `openapi-fetch` + `openapi-react-query` | Types come from `@mutuals/core` | 029 |
-| `packages/ui`, `packages/contracts`, `packages/llm`, `packages/jobs`, `packages/import`, `packages/api-client` | Directories inside the two apps and `packages/core` | 006 |
-| `pnpm strictPeerDependencies: true` | Default (off) | 004 |
-| Commented-out `tasks:` block in `pnpm-workspace.yaml` | The escalation path is recorded in prose only | 005 |
-| `e2e` workspace package before the first spec | Created in Stage 2 | 006 |
-| `EMBEDDINGS_*` keys in `.env.example` at Stage 1 | Documented in `ARCHITECTURE.md`, added in Stage 8 | 010, 066 |
-| The `.pgdata` project-local cluster script (`brew install`, `sudo apt-get`, mutable git tag → `make install`) | Detect-and-instruct; installs only behind `--install` | 012 |
-| `pgcrypto` in the required-extension list | `gen_random_uuid()` is core since PG13 | 002 |
-| Cluster-wide `lc_ctype=C` | Column-level `COLLATE "C"` on `text_sort` only | 018 |
-| The TypeScript text fold, the `unaccent.rules` port, the TS trigram implementation, the 100-pair contract test | One SQL implementation | 018, 074 |
-| `contact.name_key` | `record.label_norm`, written by the existing trigger | 018 |
-| Tier 2 reserved slugs (~90 SQL keywords); `type` and the query-param names in tier 3 | Two tiers, three hazard names | 039 |
-| `exactOptionalPropertyTypes` | `strict` + `noUncheckedIndexedAccess` | 003 |
-| Generic parameters on `AttributeTypeDefinition` | Non-generic + a mapped-type accessor | 035 |
-| Twelve relative presets incl. `next_7/30/90_days` | The two the brief names, plus `older_than`/`newer_than`; forward presets in Stage 4 | 038 |
-| `occurrencesBetween` | Nothing in Phase 1 enumerates future occurrences | 041 |
-| `libphonenumber-js/max` (157,588 B of metadata) | `/min` (83,972 B); the mobile/landline split is a no-op in merged plans | 034 |
-| `packages/core/./sql` subpath | The compiler lives in `packages/db` | 032 |
-| Column sizing and resizing | `size` on the `ColumnDef` for default widths | 048 |
-| `autoCodeSplitting`, the React Compiler | No measured win at ~30 virtualised rows | 044 |
-| The 64 KB client-side file peek in the import wizard | The server detects the delimiter and returns the first rows | 051 |
-| A duplicated `operators.ts` in the UI plus a test asserting it agrees with core | Core exports operator keys per type; the compiler enforces agreement | 036 |
-| The full dark-mode contrast unit test and dark screenshots per stage | Dark tokens ship; the toggle does not | 053 |
-| CI-enforced frame-time and p95 budgets | Measured and recorded in `ARCHITECTURE.md`, not gated | 075 |
-| `search.reindex-record` queue and handler | The projector already maintains `search_document` in-transaction | 054 |
-| `EnqueueOptions.debounceSeconds` / `key`, the 8 KB payload cap, `JobContext.signal`, re-entrant `JobContext.queue` | Three-method port | 054 |
-| `import.failed` dead-letter queue | `import_batch.status='failed'` + `last_committed_row` | 058 |
-| `llm_model_price`, the daily price-refresh job, estimated-cost arithmetic | `cost_usd = NULL, cost_source='unreported'` | 067 |
-| `llm.trace-prune`, `LLM_TRACE_RETENTION_DAYS` | One documented `DELETE` in `ARCHITECTURE.md` | 065 |
-| Phase-1 embedding dimension probe, model-mixing guard, `pnpm llm:reembed` | Stage 8, with `embeddings.backfill` | 066 |
-| `prompts.lock.json` CI enforcement before Stage 6 | Enforced from the end of Stage 6; `pnpm llm:relock` | 064 |
-| `pnpm llm:record` + `fixtures/llm/*.json` at Stage 1 | Stage 6; hand-written fixtures until then | 069 |
-| The `perf` Vitest project, the nightly perf workflow, `perf/baseline.json`, `perf-summary.mjs` | Stage 7 | 075 |
-| `mutuals_now()` and `SET LOCAL mutuals.now` | Timestamps bound as parameters | 078 |
-| Playwright `retries: 2` + `retryStrategy: 'isolated'` + `failOnFlakyTests` | `retries: 1` in CI | 076 |
-| `--tmpfs`, `fsync=off`, `synchronous_commit=off`, `jit=off` tuning | Chosen before any measurement existed | 012 |
-| Named scenario builders (`warmInvestor`, `identifierDuplicate`, …) at Stage 0 | Stage 5, with duplicates and merge | 073 |
-| Pre-specified property-test cardinalities (5,000 / 1,000 / 10,000) | The tests stay; the invented precision goes | 074 |
-| A committed OpenAPI **snapshot** contract test as a Stage-1 gate | The regenerate-and-diff gate is enough | 080 |
+| Removed                                                                                                            | Where it went                                                                       | ADR      |
+| ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | -------- |
+| `?count=auto\|exact\|none`, `reltuples` estimation, `meta.totalIsEstimate`                                         | `meta.total` is an exact nullable integer; an estimate is additive later            | 022      |
+| Cursor `(filter, sort)` signature hash and the `stale_cursor` 400                                                  | The cursor stays opaque                                                             | 022      |
+| `.notx.sql` reserved migration suffix                                                                              | Deleted; Kysely's Migrator structurally cannot honour it                            | 027      |
+| Three of four generated-artifact CI gates; committed `schema.d.ts`                                                 | One gate: `docs/openapi.json`                                                       | 029, 080 |
+| A published `bearerAuth` security scheme nothing enforces                                                          | The empty `preHandler` plugin is §7's middleware slot                               | 028      |
+| "Where should error `type` URIs point?" as a human question                                                        | GitHub docs anchors; RFC 9457 does not require dereferencing                        | 030      |
+| `openapi-typescript` + `openapi-fetch` + `openapi-react-query`                                                     | Types come from `@mutuals/core`                                                     | 029      |
+| `packages/ui`, `packages/contracts`, `packages/llm`, `packages/jobs`, `packages/import`, `packages/api-client`     | Directories inside the two apps and `packages/core`                                 | 006      |
+| `pnpm strictPeerDependencies: true`                                                                                | Default (off)                                                                       | 004      |
+| Commented-out `tasks:` block in `pnpm-workspace.yaml`                                                              | The escalation path is recorded in prose only                                       | 005      |
+| `e2e` workspace package before the first spec                                                                      | Created in Stage 2                                                                  | 006      |
+| `EMBEDDINGS_*` keys in `.env.example` at Stage 1                                                                   | Documented in `ARCHITECTURE.md`, added in Stage 8                                   | 010, 066 |
+| The `.pgdata` project-local cluster script (`brew install`, `sudo apt-get`, mutable git tag → `make install`)      | Detect-and-instruct; installs only behind `--install`                               | 012      |
+| `pgcrypto` in the required-extension list                                                                          | `gen_random_uuid()` is core since PG13                                              | 002      |
+| Cluster-wide `lc_ctype=C`                                                                                          | Column-level `COLLATE "C"` on `text_sort` only                                      | 018      |
+| The TypeScript text fold, the `unaccent.rules` port, the TS trigram implementation, the 100-pair contract test     | One SQL implementation                                                              | 018, 074 |
+| `contact.name_key`                                                                                                 | `record.label_norm`, written by the existing trigger                                | 018      |
+| Tier 2 reserved slugs (~90 SQL keywords); `type` and the query-param names in tier 3                               | Two tiers, three hazard names                                                       | 039      |
+| `exactOptionalPropertyTypes`                                                                                       | `strict` + `noUncheckedIndexedAccess`                                               | 003      |
+| Generic parameters on `AttributeTypeDefinition`                                                                    | Non-generic + a mapped-type accessor                                                | 035      |
+| Twelve relative presets incl. `next_7/30/90_days`                                                                  | The two the brief names, plus `older_than`/`newer_than`; forward presets in Stage 4 | 038      |
+| `occurrencesBetween`                                                                                               | Nothing in Phase 1 enumerates future occurrences                                    | 041      |
+| `libphonenumber-js/max` (157,588 B of metadata)                                                                    | `/min` (83,972 B); the mobile/landline split is a no-op in merged plans             | 034      |
+| `packages/core/./sql` subpath                                                                                      | The compiler lives in `packages/db`                                                 | 032      |
+| Column sizing and resizing                                                                                         | `size` on the `ColumnDef` for default widths                                        | 048      |
+| `autoCodeSplitting`, the React Compiler                                                                            | No measured win at ~30 virtualised rows                                             | 044      |
+| The 64 KB client-side file peek in the import wizard                                                               | The server detects the delimiter and returns the first rows                         | 051      |
+| A duplicated `operators.ts` in the UI plus a test asserting it agrees with core                                    | Core exports operator keys per type; the compiler enforces agreement                | 036      |
+| The full dark-mode contrast unit test and dark screenshots per stage                                               | Dark tokens ship; the toggle does not                                               | 053      |
+| CI-enforced frame-time and p95 budgets                                                                             | Measured and recorded in `ARCHITECTURE.md`, not gated                               | 075      |
+| `search.reindex-record` queue and handler                                                                          | The projector already maintains `search_document` in-transaction                    | 054      |
+| `EnqueueOptions.debounceSeconds` / `key`, the 8 KB payload cap, `JobContext.signal`, re-entrant `JobContext.queue` | Three-method port                                                                   | 054      |
+| `import.failed` dead-letter queue                                                                                  | `import_batch.status='failed'` + `last_committed_row`                               | 058      |
+| `llm_model_price`, the daily price-refresh job, estimated-cost arithmetic                                          | `cost_usd = NULL, cost_source='unreported'`                                         | 067      |
+| `llm.trace-prune`, `LLM_TRACE_RETENTION_DAYS`                                                                      | One documented `DELETE` in `ARCHITECTURE.md`                                        | 065      |
+| Phase-1 embedding dimension probe, model-mixing guard, `pnpm llm:reembed`                                          | Stage 8, with `embeddings.backfill`                                                 | 066      |
+| `prompts.lock.json` CI enforcement before Stage 6                                                                  | Enforced from the end of Stage 6; `pnpm llm:relock`                                 | 064      |
+| `pnpm llm:record` + `fixtures/llm/*.json` at Stage 1                                                               | Stage 6; hand-written fixtures until then                                           | 069      |
+| The `perf` Vitest project, the nightly perf workflow, `perf/baseline.json`, `perf-summary.mjs`                     | Stage 7                                                                             | 075      |
+| `mutuals_now()` and `SET LOCAL mutuals.now`                                                                        | Timestamps bound as parameters                                                      | 078      |
+| Playwright `retries: 2` + `retryStrategy: 'isolated'` + `failOnFlakyTests`                                         | `retries: 1` in CI                                                                  | 076      |
+| `--tmpfs`, `fsync=off`, `synchronous_commit=off`, `jit=off` tuning                                                 | Chosen before any measurement existed                                               | 012      |
+| Named scenario builders (`warmInvestor`, `identifierDuplicate`, …) at Stage 0                                      | Stage 5, with duplicates and merge                                                  | 073      |
+| Pre-specified property-test cardinalities (5,000 / 1,000 / 10,000)                                                 | The tests stay; the invented precision goes                                         | 074      |
+| A committed OpenAPI **snapshot** contract test as a Stage-1 gate                                                   | The regenerate-and-diff gate is enough                                              | 080      |
 
 ---
 
 ## 10. Extension points kept, because §9 of the brief demands them
 
-| Later feature | Extension point, present from Stage 1 |
-|---|---|
-| Semantic search / embeddings | `search_document.embedding vector(1536)` (nullable, unindexed); `EmbeddingProvider.embed()` typed and fixture-tested; `search` API takes `mode` (`keyword` now); HNSW index created **after** the first backfill, never on an empty column; pgvector's 2000/4000 index dimension cap recorded |
-| Synergy and stay-in-touch nudges | `follow_up.origin = 'system'`; `asks` / `offers` tags seeded on day one; `contact_metrics.warmth`; `apps/api/src/jobs/` with `SCHEDULES` and the port. Rule recorded: intro suggestions only on an ask↔offer match, never topic similarity |
-| Chat channels (Telegram, WhatsApp) | `quickCapture` and `ask` are complete API operations; `interaction.source` and `fact.source` already carry the values |
-| Voice input | Quick capture takes plain text; a speech-to-text step prepends |
-| Gmail / Calendar sync | `interaction.source` includes `gmail`/`calendar`; `apps/api/src/integrations/` with the `fetchSince(cursor)` interface; a `sync_state` table stub |
-| Enrichment crawler | `record.last_enriched_at` / `enriched_by`; per-value provenance already exists (`attribute_value.fact_id`) |
-| Network graph | `record_link` is first-class and queryable; `getContactConnections` is a named operation |
-| Dashboard charts | `getStats` returns simple aggregates from `contact_metrics` / `organization_metrics` |
-| Auth, multi-user, multi-tenant | Nullable-but-populated `workspace_id` on every table (ADR-014); the empty `preHandler` plugin; no global "current user" singleton |
-| CLI client · MCP server | `operations.ts` — every UI action is one named operation; `docs/openapi.json` is committed |
-| animate-ui | Components stay shadcn-standard, `data-slot` attributes intact |
-| Bitemporal value resolution | `project_record_as_of(record, date)` — same function, one predicate, no schema change (ADR-021) |
-| `current_values jsonb` render cache | One column, one projector line, one serialiser branch (ADR-013) |
-| Promoting a hot attribute to a real column | Add `contact.city`, backfill, teach the field registry; the compiler emits `c.city` instead of an `EXISTS`. No API, UI or fact-log change |
-| Keyset pagination on custom sorts | The cursor is already opaque (ADR-023) |
+| Later feature                              | Extension point, present from Stage 1                                                                                                                                                                                                                                                         |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Semantic search / embeddings               | `search_document.embedding vector(1536)` (nullable, unindexed); `EmbeddingProvider.embed()` typed and fixture-tested; `search` API takes `mode` (`keyword` now); HNSW index created **after** the first backfill, never on an empty column; pgvector's 2000/4000 index dimension cap recorded |
+| Synergy and stay-in-touch nudges           | `follow_up.origin = 'system'`; `asks` / `offers` tags seeded on day one; `contact_metrics.warmth`; `apps/api/src/jobs/` with `SCHEDULES` and the port. Rule recorded: intro suggestions only on an ask↔offer match, never topic similarity                                                    |
+| Chat channels (Telegram, WhatsApp)         | `quickCapture` and `ask` are complete API operations; `interaction.source` and `fact.source` already carry the values                                                                                                                                                                         |
+| Voice input                                | Quick capture takes plain text; a speech-to-text step prepends                                                                                                                                                                                                                                |
+| Gmail / Calendar sync                      | `interaction.source` includes `gmail`/`calendar`; `apps/api/src/integrations/` with the `fetchSince(cursor)` interface; a `sync_state` table stub                                                                                                                                             |
+| Enrichment crawler                         | `record.last_enriched_at` / `enriched_by`; per-value provenance already exists (`attribute_value.fact_id`)                                                                                                                                                                                    |
+| Network graph                              | `record_link` is first-class and queryable; `getContactConnections` is a named operation                                                                                                                                                                                                      |
+| Dashboard charts                           | `getStats` returns simple aggregates from `contact_metrics` / `organization_metrics`                                                                                                                                                                                                          |
+| Auth, multi-user, multi-tenant             | Nullable-but-populated `workspace_id` on every table (ADR-014); the empty `preHandler` plugin; no global "current user" singleton                                                                                                                                                             |
+| CLI client · MCP server                    | `operations.ts` — every UI action is one named operation; `docs/openapi.json` is committed                                                                                                                                                                                                    |
+| animate-ui                                 | Components stay shadcn-standard, `data-slot` attributes intact                                                                                                                                                                                                                                |
+| Bitemporal value resolution                | `project_record_as_of(record, date)` — same function, one predicate, no schema change (ADR-021)                                                                                                                                                                                               |
+| `current_values jsonb` render cache        | One column, one projector line, one serialiser branch (ADR-013)                                                                                                                                                                                                                               |
+| Promoting a hot attribute to a real column | Add `contact.city`, backfill, teach the field registry; the compiler emits `c.city` instead of an `EXISTS`. No API, UI or fact-log change                                                                                                                                                     |
+| Keyset pagination on custom sorts          | The cursor is already opaque (ADR-023)                                                                                                                                                                                                                                                        |
 
 ---
 
@@ -2092,24 +2111,24 @@ Every version below was read from the live npm registry with `npm view <pkg> ver
 
 ### 11.1 Root (dev tooling)
 
-| Package | Pin | Verified in this session |
-|---|---|---|
-| `pnpm` | `11.25.0` | registry `latest` (`latest-12` = 12.3.1) |
-| `typescript` | `6.0.3` | published stable; `latest` is 7.0.2, `next` is 7.1.0-dev |
-| `typescript-eslint` | `8.69.0` | peers `eslint ^8.57 \|\| ^9 \|\| ^10`, **`typescript >=4.8.4 <6.1.0`** |
-| `eslint` | `10.9.1` | `engines: ^20.19 \|\| ^22.13 \|\| >=24` |
-| `@eslint/js` | `10.0.1` | registry |
-| `eslint-config-prettier` | `10.1.8` | registry; exports `./flat` |
-| `eslint-plugin-react-hooks` | `7.1.1` | registry |
-| `eslint-plugin-react-refresh` | `0.5.6` | registry |
-| `globals` | `17.12.0` | registry |
-| `prettier` | `3.9.6` | registry |
-| `prettier-plugin-tailwindcss` | `0.8.1` | registry |
-| `vitest` | `4.1.11` | registry |
-| `@vitest/coverage-v8` | `4.1.11` | registry |
-| `@faker-js/faker` | `10.5.0` | dist-tag **`stable`** (`latest` is 10.6.0) |
-| `@types/node` | `24.13.3` | **corrected** — see note below; `latest` is 26.4.1 |
-| `esbuild` | `0.28.2` | registry — build-only, never in the dev loop |
+| Package                       | Pin       | Verified in this session                                               |
+| ----------------------------- | --------- | ---------------------------------------------------------------------- |
+| `pnpm`                        | `11.25.0` | registry `latest` (`latest-12` = 12.3.1)                               |
+| `typescript`                  | `6.0.3`   | published stable; `latest` is 7.0.2, `next` is 7.1.0-dev               |
+| `typescript-eslint`           | `8.69.0`  | peers `eslint ^8.57 \|\| ^9 \|\| ^10`, **`typescript >=4.8.4 <6.1.0`** |
+| `eslint`                      | `10.9.1`  | `engines: ^20.19 \|\| ^22.13 \|\| >=24`                                |
+| `@eslint/js`                  | `10.0.1`  | registry                                                               |
+| `eslint-config-prettier`      | `10.1.8`  | registry; exports `./flat`                                             |
+| `eslint-plugin-react-hooks`   | `7.1.1`   | registry                                                               |
+| `eslint-plugin-react-refresh` | `0.5.6`   | registry                                                               |
+| `globals`                     | `17.12.0` | registry                                                               |
+| `prettier`                    | `3.9.6`   | registry                                                               |
+| `prettier-plugin-tailwindcss` | `0.8.1`   | registry                                                               |
+| `vitest`                      | `4.1.11`  | registry                                                               |
+| `@vitest/coverage-v8`         | `4.1.11`  | registry                                                               |
+| `@faker-js/faker`             | `10.5.0`  | dist-tag **`stable`** (`latest` is 10.6.0)                             |
+| `@types/node`                 | `24.13.3` | **corrected** — see note below; `latest` is 26.4.1                     |
+| `esbuild`                     | `0.28.2`  | registry — build-only, never in the dev loop                           |
 
 **`@types/node` is pinned to the 24 line, not `latest`.** `latest` is 26.4.1 and carries the `ts6.0`
 dist-tag, which is why the earlier draft picked it — but it describes **Node 26** APIs while
@@ -2122,63 +2141,63 @@ fail to compile under TS 6, take 26.4.1 and accept the API overshoot — and say
 
 ### 11.2 `apps/api`
 
-| Package | Pin | Verified |
-|---|---|---|
-| `fastify` | `5.12.1` | registry |
-| `fastify-type-provider-zod` | `7.0.0` | peers `zod >=4.1.5`, `fastify ^5.5.0`, `@fastify/swagger >=9.5.1`, `openapi-types ^12.1.3` |
-| `@fastify/swagger` | `9.8.1` | registry |
-| `@fastify/swagger-ui` | `6.1.1` | registry |
-| `@fastify/static` | `10.1.3` | registry — serves `apps/web/dist` in production |
-| `@fastify/multipart` | `10.1.1` | registry — the import upload (ADR-031) |
-| `pino` / `pino-pretty` | `10.3.1` / `13.1.3` | registry |
-| `pg-boss` | `12.29.0` | `engines >=22.12.0`; deps only `pg ^8.23.0`, `cron-parser ^5.10.0`, `serialize-error ^13.0.1` — **Stage 5** |
-| `csv-parse` | `7.0.2` | registry — streaming CSV, **Stage 5** |
-| `exceljs` | `4.4.0` | registry — streaming `.xlsx` reader, **Stage 5** |
-| `vcard4` | `4.0.5` | registry — `.vcf`, **Stage 5** |
-| `msw` | `2.15.0` | registry — dev only, **Stage 6** |
+| Package                     | Pin                 | Verified                                                                                                    |
+| --------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `fastify`                   | `5.12.1`            | registry                                                                                                    |
+| `fastify-type-provider-zod` | `7.0.0`             | peers `zod >=4.1.5`, `fastify ^5.5.0`, `@fastify/swagger >=9.5.1`, `openapi-types ^12.1.3`                  |
+| `@fastify/swagger`          | `9.8.1`             | registry                                                                                                    |
+| `@fastify/swagger-ui`       | `6.1.1`             | registry                                                                                                    |
+| `@fastify/static`           | `10.1.3`            | registry — serves `apps/web/dist` in production                                                             |
+| `@fastify/multipart`        | `10.1.1`            | registry — the import upload (ADR-031)                                                                      |
+| `pino` / `pino-pretty`      | `10.3.1` / `13.1.3` | registry                                                                                                    |
+| `pg-boss`                   | `12.29.0`           | `engines >=22.12.0`; deps only `pg ^8.23.0`, `cron-parser ^5.10.0`, `serialize-error ^13.0.1` — **Stage 5** |
+| `csv-parse`                 | `7.0.2`             | registry — streaming CSV, **Stage 5**                                                                       |
+| `exceljs`                   | `4.4.0`             | registry — streaming `.xlsx` reader, **Stage 5**                                                            |
+| `vcard4`                    | `4.0.5`             | registry — `.vcf`, **Stage 5**                                                                              |
+| `msw`                       | `2.15.0`            | registry — dev only, **Stage 6**                                                                            |
 
 ### 11.3 `packages/db`
 
-| Package | Pin | Verified |
-|---|---|---|
-| `kysely` | `0.29.5` | `engines: node >=22`, `type: module` (ESM-only), TS ≥5.4 |
-| `pg` | `8.23.0` | registry |
-| `@types/pg` | `8.23.1` | **corrected** — the earlier draft's `8.15.6` was the one version in this document read from memory; the registry says 8.23.1 |
+| Package          | Pin      | Verified                                                                                                                                                             |
+| ---------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kysely`         | `0.29.5` | `engines: node >=22`, `type: module` (ESM-only), TS ≥5.4                                                                                                             |
+| `pg`             | `8.23.0` | registry                                                                                                                                                             |
+| `@types/pg`      | `8.23.1` | **corrected** — the earlier draft's `8.15.6` was the one version in this document read from memory; the registry says 8.23.1                                         |
 | `kysely-codegen` | `0.20.0` | **dev only, non-gating** — `peerDependencies.kysely >=0.27.0 <1.0.0`, but `devDependencies.kysely` is `^0.28.11` and it has not published since 2026-02-16 (ADR-027) |
 
 ### 11.4 `packages/core`
 
-| Package | Pin | Verified |
-|---|---|---|
-| `zod` | `4.5.4` | registry |
+| Package             | Pin       | Verified                                                |
+| ------------------- | --------- | ------------------------------------------------------- |
+| `zod`               | `4.5.4`   | registry                                                |
 | `libphonenumber-js` | `1.13.12` | registry; the **`/min`** metadata entry point (ADR-035) |
 
 ### 11.5 `apps/web`
 
-| Package | Pin | Verified |
-|---|---|---|
-| `react` / `react-dom` | `19.2.8` | registry |
-| `@types/react` / `@types/react-dom` | `19.2.18` / `19.2.7` | **added** — missing from the earlier draft; a React + strict-TS app does not compile without them |
-| `vite` | `8.2.2` | `engines: ^20.19 \|\| >=22.12` |
-| `@vitejs/plugin-react` | `6.1.1` | registry; babel/compiler peers are **optional** |
-| `tailwindcss` / `@tailwindcss/vite` | `4.3.3` / `4.3.3` | registry |
-| `tw-animate-css` | `1.4.0` | registry |
-| `@tanstack/react-router` | `1.170.32` | registry |
-| `@tanstack/router-plugin` | `1.168.35` | registry; peer range is `>=5 \|\| >=6 \|\| >=7 \|\| >=8` with `vite` **optional** |
-| `@tanstack/react-query` | `5.102.8` | registry (v6 is Svelte/Solid adapters only) |
-| `@tanstack/react-table` | `9.2.4` | registry; shadcn's data-table docs are on v9 |
-| `@tanstack/react-virtual` | `3.14.10` | registry |
-| `react-hook-form` | `7.87.0` | registry (8.x is beta only) |
-| `@hookform/resolvers` | `5.9.1` | peers `react-hook-form ^7.55.0`, `zod ^3.25 \|\| ^4` |
-| `radix-ui` | `1.6.7` | registry (Base UI is `1.0.0-rc.0` — not used) |
-| `lucide-react` | `1.40.0` | **corrected** to the current `latest`; the earlier draft pinned 1.39.0 with a hedge |
-| `cmdk` | `1.1.1` | registry — ⌘K palette |
-| `sonner` | `2.0.8` | registry — toasts |
-| `@dnd-kit/core` / `@dnd-kit/sortable` | `6.3.1` / `10.0.0` | registry — column reorder |
-| `date-fns` | `4.4.0` | registry — relative dates in the UI only |
-| `react-day-picker` | `10.0.1` | registry — shadcn Calendar |
-| `class-variance-authority` / `clsx` / `tailwind-merge` | `0.7.1` / `2.1.1` / `3.6.0` | registry |
-| `shadcn` (CLI) | `4.20.1` | registry — run via `pnpm dlx`, **not** a dependency |
+| Package                                                | Pin                         | Verified                                                                                          |
+| ------------------------------------------------------ | --------------------------- | ------------------------------------------------------------------------------------------------- |
+| `react` / `react-dom`                                  | `19.2.8`                    | registry                                                                                          |
+| `@types/react` / `@types/react-dom`                    | `19.2.18` / `19.2.7`        | **added** — missing from the earlier draft; a React + strict-TS app does not compile without them |
+| `vite`                                                 | `8.2.2`                     | `engines: ^20.19 \|\| >=22.12`                                                                    |
+| `@vitejs/plugin-react`                                 | `6.1.1`                     | registry; babel/compiler peers are **optional**                                                   |
+| `tailwindcss` / `@tailwindcss/vite`                    | `4.3.3` / `4.3.3`           | registry                                                                                          |
+| `tw-animate-css`                                       | `1.4.0`                     | registry                                                                                          |
+| `@tanstack/react-router`                               | `1.170.32`                  | registry                                                                                          |
+| `@tanstack/router-plugin`                              | `1.168.35`                  | registry; peer range is `>=5 \|\| >=6 \|\| >=7 \|\| >=8` with `vite` **optional**                 |
+| `@tanstack/react-query`                                | `5.102.8`                   | registry (v6 is Svelte/Solid adapters only)                                                       |
+| `@tanstack/react-table`                                | `9.2.4`                     | registry; shadcn's data-table docs are on v9                                                      |
+| `@tanstack/react-virtual`                              | `3.14.10`                   | registry                                                                                          |
+| `react-hook-form`                                      | `7.87.0`                    | registry (8.x is beta only)                                                                       |
+| `@hookform/resolvers`                                  | `5.9.1`                     | peers `react-hook-form ^7.55.0`, `zod ^3.25 \|\| ^4`                                              |
+| `radix-ui`                                             | `1.6.7`                     | registry (Base UI is `1.0.0-rc.0` — not used)                                                     |
+| `lucide-react`                                         | `1.40.0`                    | **corrected** to the current `latest`; the earlier draft pinned 1.39.0 with a hedge               |
+| `cmdk`                                                 | `1.1.1`                     | registry — ⌘K palette                                                                             |
+| `sonner`                                               | `2.0.8`                     | registry — toasts                                                                                 |
+| `@dnd-kit/core` / `@dnd-kit/sortable`                  | `6.3.1` / `10.0.0`          | registry — column reorder                                                                         |
+| `date-fns`                                             | `4.4.0`                     | registry — relative dates in the UI only                                                          |
+| `react-day-picker`                                     | `10.0.1`                    | registry — shadcn Calendar                                                                        |
+| `class-variance-authority` / `clsx` / `tailwind-merge` | `0.7.1` / `2.1.1` / `3.6.0` | registry                                                                                          |
+| `shadcn` (CLI)                                         | `4.20.1`                    | registry — run via `pnpm dlx`, **not** a dependency                                               |
 
 ### 11.6 `e2e` (Stage 2 onward)
 
@@ -2333,23 +2352,23 @@ mutuals/
 
 **R1 — Every performance number in this design is an extrapolation.** No Postgres existed in the
 environment where the storage decision was written, and the same is true of every frontend frame-time
-figure. *Falsifier:* Stage 1's 10k-contact × 60-attribute generator plus `EXPLAIN (ANALYZE, BUFFERS)`
+figure. _Falsifier:_ Stage 1's 10k-contact × 60-attribute generator plus `EXPLAIN (ANALYZE, BUFFERS)`
 for each of the nine operator shapes. If a three-chip filtered page is not in single-digit
 milliseconds, or if the `ORDER BY` on a custom attribute spills `work_mem`, the escape hatch is the
 two-phase index-ordered pagination in `storage-DECISION.md` §9.4 — a **query** change, not a schema
-change, which is the whole reason the typed table exists. *This is the largest remaining unknown and
-it was the largest unknown in all four storage proposals.*
+change, which is the whole reason the typed table exists. _This is the largest remaining unknown and
+it was the largest unknown in all four storage proposals._
 
 **R2 — `kysely-codegen` may not run against this schema at all.** It is untested against
-`kysely@0.29.x` and stale since February. *Falsifier:* a 30-minute Stage-0 spike — apply migration
+`kysely@0.29.x` and stale since February. _Falsifier:_ a 30-minute Stage-0 spike — apply migration
 `0002` (composite FK, `NULLS NOT DISTINCT`, partial unique index, mixed-opclass GIN, generated
-tsvector) to a real database and run the generator. *Impact if it fails:* none to the architecture,
+tsvector) to a real database and run the generator. _Impact if it fails:_ none to the architecture,
 because ADR-027 already made the hand-written `schema.ts` the plan and the tool merely a bootstrap.
-What weakens is the *argument* for Kysely over Drizzle: "drift is impossible by construction" becomes
+What weakens is the _argument_ for Kysely over Drizzle: "drift is impossible by construction" becomes
 "drift fails a test", which is a materially weaker claim and is stated as such in ADR-027.
 
 **R3 — The projection can silently diverge from the fact log.** The entire safety case for keeping a
-derived copy is that a full rebuild reproduces it. *Falsifier:* the per-record digest gate (ADR-025).
+derived copy is that a full rebuild reproduces it. _Falsifier:_ the per-record digest gate (ADR-025).
 If it ever trips for a reason other than a known bug, the answer is to make the projector the only
 writer — the `AFTER STATEMENT` trigger already exists as the backstop, and the bulk path's GUC bypass
 is the one hole; a forgotten bypass is caught by the gate rather than by a user.
@@ -2357,11 +2376,11 @@ is the one hole; a forgotten bypass is caught by the gate rather than by a user.
 **R4 — Attribute values are not typed end-to-end, and cannot be.** Kysely knows `attribute_value`, not
 `check_size`. Runtime typing comes from Zod schemas built from `attribute_definition`. §3.2's "typed
 end-to-end" is true for the envelope and false for user attribute values. This is a limitation of any
-dynamic-attribute design; it is named rather than implied away. *Falsifier:* none — it is structural.
+dynamic-attribute design; it is named rather than implied away. _Falsifier:_ none — it is structural.
 
 **R5 — A 10k-row import is the peak write event and it is the least-tested path.** ~150k facts,
 ~150k value rows, ~300k composite-FK parent probes, one `COPY`, one set-based projection, and the
-duplicate probe for every identifier. *Falsifier:* the Stage-5 acceptance test — import the LinkedIn
+duplicate probe for every identifier. _Falsifier:_ the Stage-5 acceptance test — import the LinkedIn
 fixture twice and assert zero duplicate values, exactly one live fact per single-valued attribute, and
 a recorded wall-clock in `ARCHITECTURE.md`. If it exceeds ~60 s, the documented fix is dropping and
 rebuilding `av_trgm_idx` around the batch.
@@ -2369,29 +2388,29 @@ rebuilding `av_trgm_idx` around the batch.
 **R6 — `mutuals_norm()` depends on the `unaccent` dictionary staying put.** It is a `STABLE` function
 used in `WHERE` clauses and by the projector, never in an index definition, so an `IMMUTABLE`-marking
 hazard does not exist — but if someone edits `unaccent.rules` on the host, stored `text_norm` values
-and new needles disagree. *Falsifier:* `pnpm db:reproject` after any extension change; the equivalence
+and new needles disagree. _Falsifier:_ `pnpm db:reproject` after any extension change; the equivalence
 gate would catch a mid-flight edit. If `unaccent` is unavailable at all, `mutuals_norm` degrades to
 `lower(btrim($1))` — one line, then a reproject, losing only accent-insensitivity.
 
-**R7 — pg-boss is maintained by one person, and pooler safety is unmeasured.** *Falsifier:* the
-Stage-5 lifecycle test against a Supabase transaction-pooler connection string. *Mitigation already
-in place:* the `JobQueue` port is three methods and one adapter file; `DROP SCHEMA pgboss CASCADE` is
+**R7 — pg-boss is maintained by one person, and pooler safety is unmeasured.** _Falsifier:_ the
+Stage-5 lifecycle test against a Supabase transaction-pooler connection string. _Mitigation already
+in place:_ the `JobQueue` port is three methods and one adapter file; `DROP SCHEMA pgboss CASCADE` is
 a complete uninstall; Graphile Worker is named in `ARCHITECTURE.md`.
 
 **R8 — `strict: true` on structured outputs is a hint, and compliance varies by upstream provider for
-the same model.** *Falsifier:* the repair rate per prompt version, which is a `SELECT` against
-`llm_call`. *Mitigation:* always re-validate, `require_parameters: true`, one repair, and a CI walker
+the same model.** _Falsifier:_ the repair rate per prompt version, which is a `SELECT` against
+`llm_call`. _Mitigation:_ always re-validate, `require_parameters: true`, one repair, and a CI walker
 that now actually visits nullable objects (ADR-066).
 
 **R9 — TanStack Table v9 is one month old (9.0.0 shipped 2026-08-04).** It is pinned because shadcn's
 mandated data-table pattern is written against it, so the "boring" choice and the "current" choice
-point the same way here — but the ecosystem around it is young. *Falsifier:* Stage 2. If v9's feature
+point the same way here — but the ecosystem around it is young. _Falsifier:_ Stage 2. If v9's feature
 gating or `columnMeta` slot behaves differently than documented, the fallback is v8 plus a hand-ported
 shadcn data-table, which costs about a day and no architecture.
 
 **R10 — Node type stripping constrains what the code may contain, forever.** No `enum`, no parameter
-properties, relative imports written with `.ts`. *Falsifier:* a dependency that ships non-erasable
-syntax in a workspace package, or a contributor who wants `tsx`. *Escape:* ADR-008's esbuild bundle
+properties, relative imports written with `.ts`. _Falsifier:_ a dependency that ships non-erasable
+syntax in a workspace package, or a contributor who wants `tsx`. _Escape:_ ADR-008's esbuild bundle
 already exists; extending it to the dev loop is a script change.
 
 **R11 — The trace table holds user text in a second place.** Acceptable for a private single-user CRM
@@ -2405,7 +2424,7 @@ implementation detail.
 **R13 — Two people, no external reviewers, and a repo future AI sessions will edit.** The mitigations
 that matter are mechanical, not documentary: the ESLint boundaries (ADR-009, ADR-071), the
 `SLOT_COLUMNS` grep test, the `operations.ts` parity assertion, the `information_schema` drift test,
-the projection equivalence gate, and `AttributeType` being *derived* so a missing case is a compile
+the projection equivalence gate, and `AttributeType` being _derived_ so a missing case is a compile
 error. Every one of those exists because prose rules in a markdown table get broken about half the
 time — as one of the rejected proposals demonstrated by breaking its own rule inside its own document.
 
@@ -2420,13 +2439,13 @@ Everything the brief already decided is not here, and everything I could decide 
 **Q1 — Working directory (Simon). ANSWERED 2026-09-03.** The project lives in
 `/Users/simonfuhrbach/code/crm` on the branch `version/claude-v1`. The earlier German Next.js +
 SQLite prototype stays on `main`, untouched and still runnable. Simon's instruction was explicit:
-*"lass den code in main liegen (ignoriere den auch mal komplett) und schreib alles von null neu"* —
+_"lass den code in main liegen (ignoriere den auch mal komplett) und schreib alles von null neu"_ —
 so nothing is ported from `main`, not code, not fixtures, not data. The branch was cleared of the old
 tree in the same commit that added these documents. The untracked local SQLite database in `data/`
 was deliberately left in place and is not referenced by anything in this branch.
 
 **Q1b — Old data (Simon). ANSWERED 2026-09-03.** The ~1,128 contacts in the old prototype's local
-database are **not** migrated. Simon: *"lass die importe erstmal weg. es geht nicht um importe."*
+database are **not** migrated. Simon: _"lass die importe erstmal weg. es geht nicht um importe."_
 The Stage 5 import wizard is still built, because the brief specifies it; it simply has no
 old-database source. No one-off SQLite→Postgres migration is planned.
 
@@ -2475,7 +2494,7 @@ before every request to the model provider; past it, AI features return a clear 
 message and everything else keeps working. Confirm the number, or name a different one. `0` disables
 the cap entirely, which I do not recommend for a key that lives in a `.env` on a laptop.
 
-*(One item is not a question but needs an acknowledgement: ADR-045 adds `phone_region` and `time_zone`
+_(One item is not a question but needs an acknowledgement: ADR-045 adds `phone_region` and `time_zone`
 to the Profile in §6.6. Both are needed — phone numbers like `089 1234567` cannot be normalised
 without a region, and warmth cannot decay on whole civil days without a timezone. `docs/BRIEF.md` is
-updated in the same PR, per §2.1.)*
+updated in the same PR, per §2.1.)_

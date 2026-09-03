@@ -3,6 +3,11 @@
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    // `types: []` is the guard: this package ships to the browser, so it must not typecheck
+    // against @types/node. `dom` is here only because TypeScript ships the WHATWG `URL` and
+    // `URLSearchParams` declarations nowhere else -- both are globals in Node 24 and in every
+    // browser, and identifier normalisation (ADR-042) is specified in terms of `new URL()`.
+    "lib": ["es2023", "dom"],
     "types": []
   },
   "include": ["src/**/*.ts"]

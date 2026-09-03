@@ -79,7 +79,10 @@ export default tseslint.config(
                 'The filter MODEL lives in core; the COMPILER lives in packages/db (ADR-033).',
             },
             { name: 'fastify', message: 'packages/core must not know about HTTP.' },
-            { name: '@mutuals/db', message: 'The dependency graph is one-way: db depends on core.' },
+            {
+              name: '@mutuals/db',
+              message: 'The dependency graph is one-way: db depends on core.',
+            },
           ],
         },
       ],

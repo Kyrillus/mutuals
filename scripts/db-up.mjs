@@ -23,8 +23,8 @@ const envPath = join(root, '.env')
 if (existsSync(envPath)) process.loadEnvFile(envPath)
 
 const has = (cmd) =>
-  spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { stdio: 'ignore' })
-    .status === 0
+  spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { stdio: 'ignore' }).status ===
+  0
 
 const DATABASES = ['mutuals_dev', 'mutuals_test', 'mutuals_e2e']
 
@@ -41,7 +41,19 @@ if (has('docker')) {
     // successful no-op rather than an error worth showing.
     const made = spawnSync(
       'docker',
-      ['compose', 'exec', '-T', 'db', 'psql', '-U', 'mutuals', '-d', 'postgres', '-c', `CREATE DATABASE ${db}`],
+      [
+        'compose',
+        'exec',
+        '-T',
+        'db',
+        'psql',
+        '-U',
+        'mutuals',
+        '-d',
+        'postgres',
+        '-c',
+        `CREATE DATABASE ${db}`,
+      ],
       { cwd: root, encoding: 'utf8' },
     )
     const already = (made.stderr ?? '').includes('already exists')
@@ -50,7 +62,20 @@ if (has('docker')) {
 
   const version = spawnSync(
     'docker',
-    ['compose', 'exec', '-T', 'db', 'psql', '-U', 'mutuals', '-d', 'mutuals_dev', '-At', '-c', 'select version()'],
+    [
+      'compose',
+      'exec',
+      '-T',
+      'db',
+      'psql',
+      '-U',
+      'mutuals',
+      '-d',
+      'mutuals_dev',
+      '-At',
+      '-c',
+      'select version()',
+    ],
     { cwd: root, encoding: 'utf8' },
   )
   console.log(`\n${dim((version.stdout ?? '').trim())}\n`)
@@ -81,7 +106,9 @@ if (has('createdb')) {
 console.error(`\n${red('✗')} ${bold('No Postgres, and no Docker.')}\n`)
 console.error('  Pick whichever is easiest — any of these works:\n')
 console.error(`  ${bold('Docker Desktop')}  docker.com/products/docker-desktop`)
-console.error(`  ${bold('Postgres.app')}    postgresapp.com — drag to Applications, click Initialize`)
+console.error(
+  `  ${bold('Postgres.app')}    postgresapp.com — drag to Applications, click Initialize`,
+)
 console.error(`  ${bold('Homebrew')}        brew install postgresql@18 pgvector`)
 console.error(`                  brew services start postgresql@18\n`)
 console.error(`  Then run ${bold('pnpm db:up')} again.\n`)

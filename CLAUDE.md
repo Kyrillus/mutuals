@@ -1,0 +1,90 @@
+# Working on Mutuals
+
+A personal people CRM. **Read `docs/BRIEF.md` before changing anything** — it is the source of truth
+for product decisions. `docs/DECISIONS.md` is the ADR log and is binding on architecture.
+
+## The one rule
+
+**Attribute definitions drive everything — never hard-code a column.** Users create fields at runtime.
+Any code that names a user-facing field is wrong. Physical slot column names (`text_value`,
+`num_value`, `date_value`, `bool_value`, `option_id`, `target_record_id`) appear in exactly one file,
+`packages/core/src/attributes/slots.ts`, and a test asserts they appear nowhere else.
+
+## Shape
+
+```
+apps/web ──HTTP──▶ apps/api ──▶ packages/db ──▶ packages/core
+    │                                              ▲
+    └────────── types + filter model ──────────────┘
+```
+
+One-way, enforced by ESLint. `packages/core` ships to the browser, so it may import nothing but `zod`
+and `libphonenumber-js` — no Node builtins, no `pg`, no `kysely`, no `fastify`.
+
+- **`packages/core`** — the domain. Attribute type registry, the filter _model_, warmth, identity
+  normalisation and duplicate matching, recurrence, the API contract schemas. Pure and tested hard.
+- **`packages/db`** — schema, migrations, the filter _compiler_, the write path, repositories.
+- **`apps/api`** — Fastify. The only way into the data. An MCP server or a CLI would be another
+  client of this, not another door.
+- **`apps/web`** — React SPA. It talks to the API and never to the database.
+
+## Data model, in one paragraph
+
+`fact` is an append-only log: every value ever observed, with `valid_from`, `observed_at`, `source`
+and `confidence`. It is the truth. `attribute_value` is its projection — every row current by
+construction, so no query has a liveness predicate to forget — and it serves every `WHERE`, every
+`ORDER BY` and every read. `record` is a supertype so `contact`, `organization` and `interaction`
+share one id space and five polymorphic tables get real `ON DELETE CASCADE`. Relations live in
+`record_link` because a link carries its own attributes (job title, from, to, primary). Derived
+columns live in `contact_metrics`. Nothing is ever silently overwritten: a new value supersedes the
+old one, and removing a multi-valued element writes a tombstone rather than a delete.
+
+## Conventions
+
+- Database identifiers are `snake_case`, everywhere, including the Kysely interface. No camelCase plugin.
+- `erasableSyntaxOnly` is on: no `enum`, no parameter properties. Use `as const` objects plus a
+  derived type. Relative imports carry the `.ts` extension.
+- Text normalisation has **one** implementation and it is SQL (`mutuals_norm()`). TypeScript never
+  produces a value that is compared against a normalised column. The casefold in
+  `packages/core/src/text/` is display-only and nothing asserts it agrees.
+- `now`, `today` and `timeZone` are injected parameters. Never read the wall clock in domain logic.
+- Comments explain _why_. If a comment restates the line below it, delete it.
+- Conventional Commits. The body explains why, not what.
+- Everything is in English: code, comments, docs, commit messages, UI.
+
+## Commands
+
+```bash
+pnpm dev          # the one command: database up, migrated, API and web running
+pnpm db:up        # just the database (and it creates dev/test/e2e)
+pnpm db:migrate   # migrations run explicitly, never on boot
+pnpm seed         # ~200 contacts, 60 organizations, 500 interactions, 40 follow-ups
+pnpm verify       # what CI runs: verify:static + verify:db
+pnpm verify:full  # ...plus Playwright
+```
+
+`pnpm` is reached through `corepack pnpm` if it is not on your PATH. Docker lives at
+`~/.docker/bin` on the author's machine and is not on the default PATH either.
+
+## Stages
+
+1. **Foundation** — migrations, domain core, query compiler, API skeleton, seed. ← _current_
+2. Contacts table + Settings → Attributes
+3. Organizations + relations + the contact detail page
+4. Follow-ups + dashboard + saved views
+5. Import wizard + duplicates + merge
+6. LLM layer (ask, quick capture, summaries) + command palette
+7. Polish and `v0.1.0`
+
+Each stage ends with green CI, updated docs, a PR and a stop for approval.
+
+## How to report back
+
+Two layers, always (brief §0):
+
+1. **Plain summary** — for Simon, who is not a developer. What was built, what he can click on, what
+   you need from him. One screen. No code, no file paths.
+2. **Technical detail** — for the co-founder. Architecture, trade-offs, test coverage, open questions.
+
+When a decision is not covered by the brief: if it is small and reversible, pick the simplest option
+and add an ADR to `docs/DECISIONS.md`. If it is large or hard to reverse, stop and ask.
