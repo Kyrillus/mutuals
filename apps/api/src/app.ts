@@ -30,6 +30,7 @@ import { contactRoutes } from './routes/contacts.ts'
 import { followUpRoutes } from './routes/follow-ups.ts'
 import { interactionRoutes } from './routes/interactions.ts'
 import { organizationRoutes } from './routes/organizations.ts'
+import { recordRoutes } from './routes/records.ts'
 import { settingsRoutes } from './routes/settings.ts'
 import { stageSixRoutes } from './routes/stage-six.ts'
 
@@ -155,6 +156,7 @@ export async function buildApp(ctx: AppContext, options: BuildOptions = {}): Pro
     async (instance) => {
       await instance.register(contactRoutes, { ctx })
       await instance.register(organizationRoutes, { ctx })
+      await instance.register(recordRoutes, { ctx })
       await instance.register(interactionRoutes, { ctx })
       await instance.register(followUpRoutes, { ctx })
       await instance.register(attributeDefinitionRoutes, { ctx })

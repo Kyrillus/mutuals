@@ -13,13 +13,14 @@
 import {
   assertNever,
   decimal,
+  valueKindOf,
   type AttributeDefinition,
   type AttributeValue,
   type Attributes,
   type OptionRef,
   type RelationValue,
 } from '@mutuals/core'
-import type { HydratedRecord, RecordRelation, RecordValue } from '@mutuals/db'
+import type { HydratedRecord, RecordRelation, RecordValue, ValueHistoryEntry } from '@mutuals/db'
 
 import type { Schema } from '../context.ts'
 
@@ -109,6 +110,62 @@ function valueOf(
     default:
       return assertNever(type, 'attribute type')
   }
+}
+
+/**
+ * §4.5's history, one fact at a time, through the very same {@link valueOf} the live value goes
+ * through — so a superseded option renders as the same chip, and a removed tag as the same tag.
+ *
+ * A history row is one fact, so a multi-valued attribute yields a one-element value here rather
+ * than the whole set: "Energy, since June" and "Energy, removed in March" are separate entries,
+ * which is what the popover has to show.
+ */
+export function serializeHistoryValue(
+  definition: AttributeDefinition,
+  entry: ValueHistoryEntry,
+): AttributeValue | null {
+  if (definition.type === 'relation') {
+    if (entry.targetRecordId === null || entry.targetObjectType === null) return null
+    return valueOf(
+      definition,
+      [],
+      [
+        {
+          attributeId: entry.attributeId,
+          toRecordId: entry.targetRecordId,
+          toLabel: entry.targetLabel ?? '',
+          toObjectType: entry.targetObjectType,
+          title: entry.linkTitle,
+          from: entry.linkFrom,
+          to: entry.linkTo,
+          isPrimary: entry.linkIsPrimary ?? false,
+          position: 0,
+          factId: entry.factId,
+        },
+      ],
+    )
+  }
+
+  return valueOf(
+    definition,
+    [
+      {
+        attributeId: entry.attributeId,
+        valueKind: valueKindOf(definition.type),
+        valueKey: entry.valueKey,
+        position: 0,
+        factId: entry.factId,
+        text: entry.text,
+        num: entry.num,
+        date: entry.date,
+        bool: entry.bool,
+        optionId: entry.optionId,
+        optionKey: entry.optionKey,
+        optionLabel: entry.optionLabel,
+      },
+    ],
+    [],
+  )
 }
 
 /** Groups a record's rows by attribute and renders each through its own type. */

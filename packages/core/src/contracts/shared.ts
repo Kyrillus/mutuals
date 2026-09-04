@@ -11,6 +11,24 @@
 export const CREATED_VIA_VALUES = ['manual', 'import', 'api', 'agent'] as const
 export type CreatedVia = (typeof CREATED_VIA_VALUES)[number]
 
+/**
+ * §4.4's provenance on a single *value*: where one fact came from.
+ *
+ * Wider than {@link CREATED_VIA_VALUES}, and deliberately so — a record is created once, but its
+ * values keep arriving from elsewhere afterwards. A crawler can fill in a website on a contact
+ * somebody typed by hand, and §4.5's history popover has to be able to say which was which.
+ */
+export const FACT_SOURCE_VALUES = [
+  'manual',
+  'import',
+  'quick_capture',
+  'agent',
+  'gmail',
+  'calendar',
+  'crawler',
+] as const
+export type FactSourceValue = (typeof FACT_SOURCE_VALUES)[number]
+
 /** §4.1: only `manual` and `import` are reachable in Phase 1; the rest are the sync stubs of §9. */
 export const INTERACTION_SOURCES = [
   'manual',

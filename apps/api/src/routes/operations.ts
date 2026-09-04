@@ -25,6 +25,9 @@ export const OPERATIONS = [
   'bulkUpdateContactAttribute',
   'getContactConnections',
 
+  // -- Records, whatever kind (§4.5) -------------------------------------------------------------
+  'getValueHistory',
+
   // -- Organizations (§6.3) ---------------------------------------------------------------------
   'listOrganizations',
   'getOrganization',

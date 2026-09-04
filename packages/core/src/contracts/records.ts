@@ -8,8 +8,8 @@
  */
 import { z } from 'zod'
 
-import { CREATED_VIA_VALUES } from './shared.ts'
-import { AttributesSchema, AttributeWriteSchema } from './attributes.ts'
+import { CREATED_VIA_VALUES, FACT_SOURCE_VALUES } from './shared.ts'
+import { AttributesSchema, AttributeValueSchema, AttributeWriteSchema } from './attributes.ts'
 import { CivilDateSchema, IsoDateTimeSchema, ObjectTypeSchema, UuidSchema } from './primitives.ts'
 
 /** §4.4's provenance marker: "Imported 12 Mar 2026 from linkedin_connections.csv". */
@@ -119,6 +119,48 @@ export const ConnectionsSchema = z.object({
     }),
   ),
 })
+
+export type Connections = z.output<typeof ConnectionsSchema>
+
+/**
+ * §4.5's history popover: every value one attribute on one record has ever held.
+ *
+ * Each entry carries a rendered {@link AttributeValueSchema} rather than the slot it came out of,
+ * so the client draws history with the same component it draws the current value with — and so the
+ * wire contract stays clear of the physical columns CLAUDE.md confines to one file.
+ *
+ * `value` is null for a tombstone: removing an element of a multi-valued attribute writes a fact
+ * rather than deleting one, and "Energy, removed in March" is a thing the popover has to say.
+ */
+export const ValueHistoryEntrySchema = z.object({
+  factId: UuidSchema,
+  value: AttributeValueSchema.nullable(),
+  /** The day the value became true, which is not the day it was recorded. */
+  validFrom: CivilDateSchema,
+  observedAt: IsoDateTimeSchema,
+  source: z.enum(FACT_SOURCE_VALUES),
+  sourceRef: z.string().nullable(),
+  /** `1` for anything a human typed; lower for what an importer or a model proposed. */
+  confidence: z.string(),
+  /** True for the one row the projection currently serves. */
+  isCurrent: z.boolean(),
+  /** True where this fact records a removal rather than a value. */
+  isRemoval: z.boolean(),
+  removedAt: IsoDateTimeSchema.nullable(),
+})
+
+export const ValueHistorySchema = z.object({
+  attributeSlug: z.string(),
+  attributeTitle: z.string(),
+  entries: z.array(ValueHistoryEntrySchema),
+})
+
+/** `Dto`, like {@link AttributeDefinitionDto}: `packages/db` exports a `ValueHistoryEntry` too, and
+ * they are different things — that one is the row, this one is the wire shape. */
+export type ValueHistoryDto = z.output<typeof ValueHistorySchema>
+export type ValueHistoryEntryDto = z.output<typeof ValueHistoryEntrySchema>
+
+export const HistoryParamSchema = z.object({ id: UuidSchema, attributeId: UuidSchema })
 
 export const BulkDeleteSchema = z.object({ ids: z.array(UuidSchema).min(1).max(500) })
 

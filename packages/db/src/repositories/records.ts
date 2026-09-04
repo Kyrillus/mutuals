@@ -97,9 +97,15 @@ export interface ValueHistoryEntry {
   readonly date: string | null
   readonly bool: boolean | null
   readonly optionId: Uuid | null
+  readonly optionKey: string | null
   readonly optionLabel: string | null
   readonly targetRecordId: Uuid | null
   readonly targetLabel: string | null
+  readonly targetObjectType: ObjectType | null
+  readonly linkTitle: string | null
+  readonly linkFrom: string | null
+  readonly linkTo: string | null
+  readonly linkIsPrimary: boolean | null
   readonly validFrom: string
   readonly observedAt: string
   readonly source: FactSource
@@ -344,9 +350,17 @@ export async function valueHistory(
       'f.date_value',
       'f.bool_value',
       'f.option_id',
+      'o.key as option_key',
       'o.label as option_label',
       'f.target_record_id',
       't.display_label as target_label',
+      't.object_type as target_object_type',
+      // Without these a relation's history could say that the organization changed but not that
+      // the job title did, which is most of what a work history is (§4.3).
+      'f.link_title',
+      'f.link_from',
+      'f.link_to',
+      'f.link_is_primary',
       'f.valid_from',
       'f.observed_at',
       'f.source',
@@ -370,9 +384,15 @@ export async function valueHistory(
     date: civilOrNull(row.date_value),
     bool: row.bool_value,
     optionId: row.option_id,
+    optionKey: row.option_key,
     optionLabel: row.option_label,
     targetRecordId: row.target_record_id,
     targetLabel: row.target_label,
+    targetObjectType: row.target_object_type,
+    linkTitle: row.link_title,
+    linkFrom: civilOrNull(row.link_from),
+    linkTo: civilOrNull(row.link_to),
+    linkIsPrimary: row.link_is_primary,
     validFrom: civilOrNull(row.valid_from) ?? '',
     observedAt: isoOf(row.observed_at),
     source: row.source,
