@@ -1,6 +1,6 @@
 import { fieldValueKind, type AttributeDefinitionDto, type FieldDescriptor } from '@mutuals/core'
 import { ChevronDown, Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, type RefObject } from 'react'
 
 import { isEditable } from '@/attributes/attribute-input.tsx'
 import { attributeFieldErrors, fieldErrors } from '@/attributes/errors.ts'
@@ -48,10 +48,16 @@ export function AddRecordButton({
 }) {
   const [open, setOpen] = useState(false)
 
+  // Radix returns focus to a `DialogTrigger` when the dialog closes. This dialog has none — it is
+  // opened from two places, the button and the dropdown item — so without this the close drops
+  // focus on the body and a keyboard user restarts from the top of the page.
+  const trigger = useRef<HTMLButtonElement>(null)
+
   return (
     <>
       <div className="flex">
         <Button
+          ref={trigger}
           size="sm"
           className="gap-1.5 rounded-r-none"
           onClick={() => {
@@ -90,6 +96,7 @@ export function AddRecordButton({
         open={open}
         onOpenChange={setOpen}
         primaryColumns={primaryColumns}
+        restoreFocusTo={trigger}
       />
     </>
   )
@@ -109,12 +116,15 @@ export function AddRecordDialog({
   open,
   onOpenChange,
   primaryColumns,
+  restoreFocusTo,
 }: {
   objectType: RecordObjectType
   label: string
   open: boolean
   onOpenChange: (open: boolean) => void
   primaryColumns?: readonly string[]
+  /** Where focus goes when the dialog closes. Radix cannot work it out without a `DialogTrigger`. */
+  restoreFocusTo?: RefObject<HTMLButtonElement | null>
 }) {
   const definitions = useAttributeDefinitions(objectType)
   const create = useCreateRecord(objectType)
@@ -189,7 +199,15 @@ export function AddRecordDialog({
         onOpenChange(next)
       }}
     >
-      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-xl">
+      <DialogContent
+        className="max-h-[85dvh] overflow-y-auto sm:max-w-xl"
+        onCloseAutoFocus={(event) => {
+          const target = restoreFocusTo?.current
+          if (!target) return
+          event.preventDefault()
+          target.focus()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Add {label}</DialogTitle>
           <DialogDescription>
