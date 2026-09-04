@@ -60,34 +60,97 @@ test('logging an interaction moves the relationship numbers', async ({ page }) =
 })
 
 /**
- * The rest of §8.1's third flow. Stage 4 turns this into `test(...)`.
+ * The rest of §8.1's third flow, now real.
  *
- * It still needs a decision that Stage 3 deliberately did not make: the browser has to be told what
- * "today" is before these dates can be exact. ADR-091 settles *how* — Playwright's own clock, not a
- * hook in production code — so this becomes `page.clock.setFixedTime(...)` at the top rather than
- * anything the app has to know about.
+ * `page.clock` pins the **browser's** clock and nothing else — the API keeps its own, and the
+ * successor's date is computed there. So this asserts the promise §4.1 actually makes, which is
+ * that the series continues and the next one is dated by the rule: two rows, one done and one open,
+ * the open one later than the one that was completed. Asserting a literal date here would be
+ * asserting what day the server thinks it is, which is not what the feature does. ADR-091 says this
+ * in the paragraph this test corrected.
  */
-test.fixme('a recurring follow-up, marked done, creates the next one', async ({ page }) => {
+test('a recurring follow-up, marked done, schedules the next one', async ({ page }) => {
+  // A Wednesday, deliberately unremarkable: no month-end clamping to reason about.
+  await page.clock.setFixedTime(new Date('2026-03-11T09:00:00Z'))
+
   await page.goto('/contacts')
-  // …contact and interaction as above…
+  await page.getByRole('cell').getByRole('button', { name: 'Add new' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('First name').fill('Grace')
+  await dialog.getByLabel('Last name').fill('Hopper')
+  await dialog.getByRole('button', { name: 'Save contact' }).click()
+  await expect(dialog).toBeHidden()
 
-  await page.getByRole('button', { name: /Add follow-up/ }).click()
-  await page.getByLabel(/Title|What/).fill('Check in with Grace')
-  await page.getByLabel(/Repeats|Recurrence/).selectOption({ label: 'Every 3 months' })
-  await page.getByRole('button', { name: /Save/ }).click()
+  // --- create it from the contact's own page, where the contact is not a question ---------------
 
-  await expect(page.getByRole('listitem').filter({ hasText: 'Check in with Grace' })).toBeVisible()
+  await page.getByRole('link', { name: /Grace Hopper/ }).click()
+  await page.getByRole('tab', { name: 'Follow-ups' }).click()
+  await expect(page.getByText('Nothing to follow up on')).toBeVisible()
 
-  await page.getByRole('checkbox', { name: /Check in with Grace/ }).check()
-  await expect(page.getByText(/Done|Completed/)).toBeVisible()
+  await page.getByRole('button', { name: 'Add follow-up' }).first().click()
+  const compose = page.getByRole('dialog')
+  await expect(compose.getByRole('heading', { name: 'Create follow-up' })).toBeVisible()
 
-  // The point of the flow: completing a recurring follow-up creates the next occurrence rather than
-  // ending the series. One open follow-up before, one open follow-up after — a different one.
+  await compose.getByLabel('Title').fill('Check in with Grace')
+  await compose.getByLabel('Due').fill('2026-03-18')
+  await compose.getByLabel('Repeats').selectOption('every_3_months')
+  await compose.getByRole('button', { name: 'Create follow-up' }).click()
+  await expect(compose).toBeHidden()
+
+  const row = page.getByRole('listitem').filter({ hasText: 'Check in with Grace' })
+  await expect(row).toHaveCount(1)
+  await expect(row).toContainText('Every 3 months')
+
+  // --- mark it done, and the series continues rather than ending --------------------------------
+
+  await page.getByRole('checkbox', { name: 'Mark Check in with Grace done' }).click()
+
+  // The successor is created inside the same operation, so the toast can name it (§4.1) — the
+  // client never sequences "complete" then "create" and never knows the recurrence rules.
+  await expect(page.getByText('Done — the next one is scheduled')).toBeVisible()
+
+  // Two rows now: the one just completed, and its successor, still open and still repeating.
+  await expect(
+    page.getByRole('checkbox', { name: 'Mark Check in with Grace not done' }),
+  ).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: 'Mark Check in with Grace done' })).toBeVisible()
+  await expect(page.getByRole('listitem').filter({ hasText: 'Check in with Grace' })).toHaveCount(2)
+
+  // --- and the split across the tabs is one of each ----------------------------------------------
+
   await page.goto('/follow-ups')
-  await expect(page.getByRole('cell', { name: 'Check in with Grace' })).toHaveCount(1)
+  await expect(page.getByRole('listitem').filter({ hasText: 'Check in with Grace' })).toHaveCount(1)
+  await expect(page.getByText('Every 3 months')).toBeVisible()
 
-  // And it is dated by the rule (three months on), not by the moment the box was ticked.
-  await expect(page.getByRole('row', { name: /Check in with Grace/ })).toContainText(
-    /in (2|3) months/,
-  )
+  await page.getByRole('tab', { name: 'Done' }).click()
+  await expect(page.getByRole('listitem').filter({ hasText: 'Check in with Grace' })).toHaveCount(1)
+})
+
+test('the dashboard counts what the follow-ups page shows', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-03-11T09:00:00Z'))
+
+  await page.goto('/contacts')
+  await page.getByRole('cell').getByRole('button', { name: 'Add new' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('First name').fill('Ada')
+  await dialog.getByLabel('Last name').fill('Lovelace')
+  await dialog.getByRole('button', { name: 'Save contact' }).click()
+  await expect(dialog).toBeHidden()
+
+  await page.goto('/follow-ups')
+  await page.getByRole('button', { name: 'Create follow-up' }).first().click()
+  const compose = page.getByRole('dialog')
+  await compose.getByLabel('Title').fill('Overdue on purpose')
+  await compose.getByLabel('Contact').fill('Ada')
+  await compose.getByRole('button', { name: /Ada Lovelace/ }).click()
+  await compose.getByLabel('Due').fill('2026-03-01')
+  await compose.getByRole('button', { name: 'Create follow-up' }).click()
+  await expect(compose).toBeHidden()
+
+  // §6.1's stat cards and §6.4's tabs read the same server-derived `state`, so they cannot disagree
+  // about what "overdue" means — which is the whole reason `state` is not computed in the client.
+  await page.goto('/')
+  const overdue = page.getByRole('link', { name: /Overdue/ })
+  await expect(overdue).toContainText('1')
+  await expect(page.getByText('Overdue on purpose')).toBeVisible()
 })
