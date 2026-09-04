@@ -1,4 +1,8 @@
+import { listResponseSchema, SavedViewSchema } from '@mutuals/core'
 import { createFileRoute, retainSearchParams, useNavigate } from '@tanstack/react-router'
+
+import { api } from '@/lib/api.ts'
+import { qk } from '@/lib/query.ts'
 
 import { AddRecordButton } from '@/features/records/add-record-dialog.tsx'
 import { RecordTable } from '@/features/records/record-table.tsx'
@@ -35,6 +39,31 @@ export const Route = createFileRoute('/contacts/')({
   // view's name while the working copy drifts. Inline rather than the shared constant so the
   // middleware's schema is inferred from this route's own search type.
   search: { middlewares: [retainSearchParams(['view'])] },
+  /**
+   * §5.2 wants the open view's name in the breadcrumb — `Contacts › Investors in Munich`. It is a
+   * second crumb rather than a rewrite of the first, which is why it lives on this route and not on
+   * the layout above it.
+   *
+   * `fetchQuery`, not `ensureQueryData`: a view saved a moment ago has just invalidated this key,
+   * and the crumb has to name it rather than the list from before it existed. `staleTime` still
+   * keeps this from being a request per navigation.
+   */
+  loaderDeps: ({ search }) => ({ view: search.view }),
+  loader: async ({ context, deps }) => {
+    if (deps.view === undefined || deps.view === null) return {}
+    const views = await context.queryClient.fetchQuery({
+      queryKey: qk.views('contact'),
+      queryFn: () =>
+        api
+          .get(listResponseSchema(SavedViewSchema), '/views', {
+            search: { objectType: 'contact' },
+          })
+          .then((response) => response.data),
+      staleTime: 5 * 60_000,
+    })
+    const open = views.find((view) => view.id === deps.view)
+    return open === undefined ? {} : { crumb: open.name }
+  },
 })
 
 function ContactsPage() {

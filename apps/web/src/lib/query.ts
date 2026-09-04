@@ -61,4 +61,6 @@ export const qk = {
   /** Every follow-up list, whatever tab or contact it is filtered to. */
   followUps: () => ['follow-ups'] as const,
   followUpList: (query: Readonly<Record<string, unknown>>) => ['follow-ups', query] as const,
+  /** §6.6's saved views, per object type. */
+  views: (objectType: string) => ['views', objectType] as const,
 }

@@ -1,4 +1,8 @@
+import { listResponseSchema, SavedViewSchema } from '@mutuals/core'
 import { createFileRoute, retainSearchParams, useNavigate } from '@tanstack/react-router'
+
+import { api } from '@/lib/api.ts'
+import { qk } from '@/lib/query.ts'
 
 import { PageHeader } from '@/components/app-shell/page.tsx'
 import { AddRecordButton } from '@/features/records/add-record-dialog.tsx'
@@ -27,8 +31,35 @@ const DIALOG_FIELDS = ['type', 'industry', 'city', 'country', 'website'] as cons
 
 export const Route = createFileRoute('/organizations/')({
   component: OrganizationsPage,
+  // ADR-047: filters, sort, columns and the view live in the URL, so a link is a view.
   validateSearch: validateListSearch,
+  // ADR-048: `?view=` rides along with every later navigation, so the breadcrumb keeps the saved
+  // view's name while the working copy drifts.
   search: { middlewares: [retainSearchParams(['view'])] },
+  /**
+   * §5.2 wants the open view's name in the breadcrumb — `Organizations › Investors in Munich`. It is a
+   * second crumb rather than a rewrite of the first, which is why it lives on this route and not on
+   * the layout above it. The list is already in the cache; this reads it rather than fetching.
+   */
+  loaderDeps: ({ search }) => ({ view: search.view }),
+  loader: async ({ context, deps }) => {
+    if (deps.view === undefined) return {}
+    // `fetchQuery`, not `ensureQueryData`: a view saved a moment ago has just invalidated this
+    // key, and the crumb must name it rather than the list from before it existed. `staleTime`
+    // still keeps this from being a request per navigation.
+    const views = await context.queryClient.fetchQuery({
+      queryKey: qk.views('organization'),
+      queryFn: () =>
+        api
+          .get(listResponseSchema(SavedViewSchema), '/views', {
+            search: { objectType: 'organization' },
+          })
+          .then((response) => response.data),
+      staleTime: 5 * 60_000,
+    })
+    const open = views.find((view) => view.id === deps.view)
+    return open === undefined ? {} : { crumb: open.name }
+  },
 })
 
 function OrganizationsPage() {

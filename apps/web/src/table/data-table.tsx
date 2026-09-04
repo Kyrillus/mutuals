@@ -84,6 +84,10 @@ export interface DataTableProps {
   readonly primaryAction?: ReactNode
   readonly emptyAction?: ReactNode
   readonly onTableSettings?: () => void
+  /** §6.6's saved-view items for the `⋮` menu. Supplied by the feature, not built here. */
+  readonly viewActions?: ReactNode
+  /** The view picker, rendered in the toolbar left of the filter bar. */
+  readonly viewPicker?: ReactNode
 }
 
 /**
@@ -132,6 +136,8 @@ export function DataTable({
   primaryAction,
   emptyAction,
   onTableSettings,
+  viewActions,
+  viewPicker,
 }: DataTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
@@ -232,7 +238,10 @@ export function DataTable({
   return (
     <div className="flex min-h-0 flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">{filterBar}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {viewPicker}
+          {filterBar}
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           <SearchBox value={query.q} onChange={onSearchChange} placeholder="Search…" />
           <ColumnsMenu
@@ -242,7 +251,7 @@ export function DataTable({
             onChange={onColumnsChange}
             onReset={onColumnsReset}
           />
-          <ViewMenu onTableSettings={onTableSettings} />
+          <ViewMenu onTableSettings={onTableSettings} viewActions={viewActions} />
           {primaryAction}
         </div>
       </div>
@@ -464,10 +473,22 @@ function SortArrow({ direction }: { direction: false | 'asc' | 'desc' }) {
 }
 
 /**
- * §5.2's `⋮`. The three saved-view actions are §6.6 and land in Stage 4; they are shown disabled
- * rather than hidden so the menu does not change shape under the user when views arrive.
+ * §5.2's `⋮`.
+ *
+ * The saved-view items are passed in rather than built here: views are a records feature and this
+ * directory is the generic table. Without a slot, `table/` would have to know what a view is in
+ * order to render three menu items — which is how a shared component stops being shared.
+ *
+ * They stay disabled when nothing is passed, rather than vanishing, so the menu does not change
+ * shape between a page that has views and one that does not.
  */
-function ViewMenu({ onTableSettings }: { onTableSettings?: () => void }) {
+function ViewMenu({
+  onTableSettings,
+  viewActions,
+}: {
+  onTableSettings?: () => void
+  viewActions?: ReactNode
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -476,9 +497,13 @@ function ViewMenu({ onTableSettings }: { onTableSettings?: () => void }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem disabled>Revert changes</DropdownMenuItem>
-        <DropdownMenuItem disabled>Save changes to view</DropdownMenuItem>
-        <DropdownMenuItem disabled>Save as new view</DropdownMenuItem>
+        {viewActions ?? (
+          <>
+            <DropdownMenuItem disabled>Revert changes</DropdownMenuItem>
+            <DropdownMenuItem disabled>Save changes to view</DropdownMenuItem>
+            <DropdownMenuItem disabled>Save as new view</DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onTableSettings}>Table settings</DropdownMenuItem>
       </DropdownMenuContent>

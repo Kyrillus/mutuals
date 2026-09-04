@@ -1,5 +1,5 @@
 import type { FieldDescriptor } from '@mutuals/core'
-import { useCallback, useMemo, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 
 import { isEditable } from '@/attributes/attribute-input.tsx'
 import { DisplayProvider } from '@/attributes/display-context.tsx'
@@ -14,6 +14,8 @@ import { Skeleton } from '@/ui/skeleton.tsx'
 import { RecordCell, RecordEditorCell, type DefinitionIndex } from './record-cell.tsx'
 import type { RecordObjectType } from './record-api.ts'
 import { useAttributeDefinitions } from './use-attribute-definitions.ts'
+import { SaveViewDialog, ViewMenuItems, ViewPicker } from '@/features/views/view-menu.tsx'
+import { useViewState } from '@/features/views/use-view-state.ts'
 import { useRecordEdit } from './use-record-edit.ts'
 import { useRecordList } from './use-record-list.ts'
 import { useDeleteRecords } from './use-record-mutations.ts'
@@ -47,6 +49,7 @@ export function RecordTable({
 }: RecordTableProps) {
   const definitions = useAttributeDefinitions(objectType)
   const list = useListQuery()
+  const [savingView, setSavingView] = useState(false)
   const editor = useRecordEdit(objectType)
   const deletion = useDeleteRecords(objectType)
 
@@ -66,6 +69,7 @@ export function RecordTable({
     () => ({ ...list.query, columns: list.query.columns ?? defaultColumns ?? null }),
     [list.query, defaultColumns],
   )
+  const viewState = useViewState(objectType, query.columns)
 
   const records = useRecordList(objectType, query)
 
@@ -173,6 +177,23 @@ export function RecordTable({
         primaryAction={primaryAction}
         emptyAction={emptyAction}
         onTableSettings={onTableSettings}
+        viewPicker={<ViewPicker state={viewState} />}
+        viewActions={
+          <ViewMenuItems
+            objectType={objectType}
+            state={viewState}
+            onSaveAsNew={() => {
+              setSavingView(true)
+            }}
+          />
+        }
+      />
+
+      <SaveViewDialog
+        open={savingView}
+        onOpenChange={setSavingView}
+        objectType={objectType}
+        state={viewState}
       />
     </DisplayProvider>
   )
