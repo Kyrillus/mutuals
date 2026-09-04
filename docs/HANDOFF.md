@@ -12,7 +12,7 @@ talked to.
 
 ## Where the work stopped
 
-**Stage 1 — Foundation: done.** **Stage 2 — Contacts table + attributes: done.** Both live in
+**Stages 1, 2 and 3 are done.** All three live in
 [PR #1](https://github.com/Kyrillus/mutuals/pull/1), which grew to cover them together and was
 retitled — see ADR-089 for why, and why that was Simon's call rather than a default.
 
@@ -23,8 +23,12 @@ retitled — see ADR-089 for why, and why that was Simon's call rather than a de
 | Section 3 | Settings navigation, the attributes list, the create/edit attribute dialog             |
 | Section 4 | Playwright e2e, the keyboard pass, the third CI job                                    |
 
-`pnpm verify` is green: 1,158 unit tests, 311 integration tests, lint, typecheck and build clean.
-`pnpm verify:e2e` is green: 7 specs, 2 `fixme`.
+**Stage 3** added the organizations table and detail page, contact↔organization links through the
+UI, §6.5's contact detail page with its four tabs, interactions CRUD, and §4.5's value-history
+popover — the first screen that reads the append-only log.
+
+`pnpm verify` is green: 1,160 unit tests, 311 integration tests, lint, typecheck and build clean.
+`pnpm verify:e2e` is green: 12 specs, 2 `fixme`.
 
 **Do not merge PR #1.** `main` has moved on — another session built a getmutuals.ai waitlist site in
 `site/`, which this branch never touches. Merging PR #1 today would delete the old German Next.js
@@ -88,30 +92,37 @@ Four traps that already cost time once each, all now guarded but worth knowing:
   import time. `apps/web/scripts/build.mjs` handles it and asserts its own output.
 - **`pnpm db:check`** generates 10,000 contacts × 60 attributes and takes about 80 seconds. It is the
   performance harness, not part of `verify`.
+- **Radix tabs and popovers do not respond to synthetic `.click()`.** Driving the app through
+  `javascript_tool` will silently fail on them; Playwright sends real pointer events and does not.
+  Verify anything tab- or popover-shaped through the e2e suite rather than through the dev console.
 
 ## The next step, verbatim
 
 Paste this as the first message of the new session:
 
-> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §4.3, §6.3 and §6.5.
+> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §6.1, §6.4 and §6.6.
 >
-> Build **Stage 3 — Organizations, relations and the contact detail page**:
+> Build **Stage 4 — Follow-ups, the dashboard and saved views**:
 >
-> 1. **Organizations**: the list page over the shared `DataTable` (§6.3) and the organization detail
->    page. The table already exists and is driven by attribute definitions — a second object type
->    should cost almost no new table code, and if it does, say so rather than copying the file.
-> 2. **Relations** (§4.3): contact↔organization links carry their own attributes — job title, from,
->    to, primary. They live in `record_link`, which Stage 1 built and nothing has yet exercised
->    through the UI. Work history renders current → past.
-> 3. **The contact detail page** (§6.5): Overview / Activities / Connections / Follow-ups, the
->    attribute sidebar, and the value-history popover showing source and date for every field. The
->    summary card stays a stub until Stage 6. Interactions CRUD lands here too.
-> 4. **Turn `e2e/specs/interaction-and-follow-up.spec.ts` from `fixme` into a real test** as far as
->    Stage 3 reaches — the interaction half. Its assertions are already written; changing one is
->    fine, but say why in the PR body. It also notes that a fixed clock has to be decided on before
->    the date assertions can be exact.
+> 1. **Follow-ups** (§6.4): the table, recurrence, snooze, and marking done. The domain is already
+>    built and unit-tested in `packages/core` — completing a recurring follow-up creates the next
+>    occurrence, and `PATCH /follow-ups/:id` already returns it as `next`. What is missing is the
+>    screen. The contact detail page has a Follow-ups tab that is currently a sentence.
+> 2. **The dashboard** (§6.1): the four stat cards, "Needs your attention", and the recently
+>    interacted list. `GET /stats` exists and the page is a stub.
+> 3. **Saved views** (§6.6): a view is a named set of columns, filters and sort. ADR-047 already put
+>    the working copy in the URL and `retainSearchParams(['view'])` rides along — what is missing is
+>    persistence and the `⋮` menu of §5.2. `listViews`/`createView`/`updateView`/`deleteView` are
+>    already named in `PLANNED_OPERATIONS`; move them to `OPERATIONS` rather than inventing names.
+> 4. **Finish `e2e/specs/interaction-and-follow-up.spec.ts`.** The interaction half is a real test;
+>    the follow-up half is still `fixme` with its assertions written. ADR-091 settles how the clock
+>    is pinned: `page.clock.setFixedTime()`, not a hook in the app.
+> 5. **Q6 needs Simon** (`docs/DECISIONS.md` §14): the nightly warmth sweep on a laptop that is
+>    asleep at 03:30. ADR-092 made the _scoped_ recompute happen on write, so this is now only about
+>    decay over time — which makes the "recompute on read if stale" option cheaper than it was when
+>    the question was written. Put it to him with that update.
 >
-> Everything goes on `version/claude-v1` and therefore into PR #1, which now covers Stages 1–3
+> Everything goes on `version/claude-v1` and therefore into PR #1, which now covers Stages 1–4
 > (ADR-089). **Still do not merge it.**
 >
 > Verify by running things, not by reading them. An agent's self-report is not evidence: the browser

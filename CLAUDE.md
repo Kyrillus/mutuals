@@ -80,8 +80,10 @@ either. `docs/HANDOFF.md` has the rest of the environment notes.
 2. ~~**Contacts table + Settings → Attributes**~~ — app shell in light and dark; the DataTable, filter
    bar and contacts page; Settings and the attribute editor; Playwright e2e and the keyboard pass.
    **Done**, in PR #1 (ADR-089 — it grew to cover both stages rather than getting one of its own).
-3. **Organizations + relations + the contact detail page** ← _current_
-4. Follow-ups + dashboard + saved views
+3. ~~**Organizations + relations + the contact detail page**~~ — the organizations table and detail
+   page, contact↔organization links with their metadata, the contact detail page and §4.5's value
+   history popover. **Done**, in PR #1 (ADR-089).
+4. **Follow-ups + dashboard + saved views** ← _current_
 5. Import wizard + duplicates + merge
 6. LLM layer (ask, quick capture, summaries) + command palette
 7. Polish and `v0.1.0`

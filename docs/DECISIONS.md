@@ -2665,3 +2665,84 @@ avoid Stage 2 being split across two PRs. **PR #1 is still never merged**: that 
 the divergence from `main`, which is untouched and is revisited at Stage 7. Retitling and rewriting
 the body is not merging. `docs/HANDOFF.md`'s "next step, verbatim" is corrected in this stage, because
 a fresh session following it would otherwise try to open a PR that cannot exist.
+
+### ADR-090 — Value history is one route on the record supertype, not one per object type
+
+**Context.** §4.5's history popover asks the same question of a contact, an organization and of
+anything a later stage adds: what did this field used to say, and who said so. `valueHistory()` had
+existed in `packages/db` since Stage 1 with no HTTP route in front of it.
+
+**Options.** (1) `GET /contacts/:id/history/:attributeId` and an organization twin, two operation
+names. (2) One route on the supertype. (3) Widen `GET /contacts/:id` to embed history eagerly.
+
+**Choice.** Option 2: `GET /records/:id/history/:attributeId`, operation `getValueHistory`. `record`
+is a supertype with one id space (ADR-015), which is exactly what makes one route correct here — and
+the 404 names the object type it _did_ find, because an id valid for a different kind of record is
+the mistake a caller actually makes.
+
+**Consequences.** Option 1 would have produced `getContactValueHistory` and
+`getOrganizationValueHistory` differing only in the word in the middle, and a third the day
+interactions get a detail page. Option 3 was rejected outright: a contact page shows twenty-odd
+attributes and almost nobody opens any of their histories, so eager loading multiplies every page
+view by twenty for a click that usually does not happen. The popover fetches when opened.
+
+The wire shape carries a rendered `AttributeValue`, not the slot it came from. That keeps the
+contract clear of the physical columns CLAUDE.md confines to one file, and it means the client draws
+history with the same `AttributeCell` it draws the live value with — a superseded option is the same
+chip it was when it was current. `serializeHistoryValue` reuses `valueOf`, so there is no second
+rendering of a typed value to drift.
+
+Two columns were added to the underlying query while doing this: the option key, and the four
+`link_*` columns. Without them a relation's history could say the organization changed but not that
+the job title had, which is most of what a work history is.
+
+### ADR-091 — The browser's clock is `DisplayProvider`; the e2e clock is Playwright's
+
+**Context.** `now`, `today` and `timeZone` are injected parameters everywhere in the domain and
+nothing there reads the wall clock (ADR-081). The browser had no stated equivalent, and Stage 2 left
+a `fixme` spec whose date assertions could not be exact without one.
+
+**Options.** (1) Ship `now` from the API in a response field. (2) A test-only query parameter or
+global the e2e run sets. (3) Name what already exists as the rule, and use Playwright's own clock.
+
+**Choice.** Option 3. `ambientDisplay()` in `display-context.tsx` is the **single** place the browser
+reads the wall clock; it refreshes once a minute and every formatter takes `today` as a parameter.
+`DisplayProvider` is the injection point, and its `overrides` already say they exist for "a test that
+pins `today`". For end-to-end determinism the suite uses `page.clock.setFixedTime()`, which freezes
+`Date` inside the browser and therefore freezes `ambientDisplay()` without the application knowing.
+
+**Consequences.** Option 2 is a test door in production code, which ADR-079 already refused once for
+the database reset; refusing it again for the clock is the same argument. Option 1 couples rendering
+a relative date to a round trip and still would not make a test deterministic. The rule this ADR
+states, and which review should enforce: **anything the domain decides — warmth, whether a follow-up
+is overdue, when the next occurrence falls — is computed server-side against the injected clock and
+travels as data. The browser may read the clock to say "3 weeks ago" and for nothing else.**
+
+Falsifier: a `grep` for `new Date()` in `apps/web/src` should return `ambientDisplay`, the CSV
+filename, and the two `datetime-local` conversions in the interaction dialog. Anything else is a
+domain decision that has leaked into the client.
+
+### ADR-092 — Derived columns are recomputed on write, scoped to the records that moved
+
+**Context.** `contact_metrics` was written in two places: zeroed when a contact is created, and
+recomputed for the whole workspace by `recomputeMetrics()` from the seed. Nothing recomputed it when
+an interaction was logged. Stage 3 built §6.5's Relationship card on those columns and the e2e spec
+for §8.1's third flow caught it immediately: log a meeting, and the card still reads zero.
+
+**Options.** (1) Leave it to the nightly sweep of Stage 4. (2) A database trigger on
+`interaction_contact`. (3) Recompute in the write path, scoped to the participants.
+
+**Choice.** Option 3. `recomputeMetrics` gained an optional `scope`, so the seed and the eventual
+sweep still call the one implementation unscoped, and the three interaction routes call it with just
+the contacts and organizations involved. An edit passes the participants from _before_ the change as
+well as after: moving an interaction from one person to another has to take the count off the first.
+
+**Consequences.** Option 1 would have shipped a card that is always zero until a seed runs, which is
+worse than no card. Option 2 puts warmth in SQL, and ADR-022 makes `computeWarmth()` in TypeScript
+the only implementation precisely so that no SQL twin exists to drift from it — a trigger would have
+had to either call out to TypeScript or become that twin.
+
+The scope is the point, not an optimisation detail. Recomputing 10,000 contacts to move one person's
+warmth is the same shape of mistake as the missing cascade indexes that made deleting a contact take
+four seconds in Stage 1. A scoped run also deliberately does **not** stamp `workspace.metrics_swept_at`,
+so Stage 4's nightly job cannot mistake one logged call for a sweep.
