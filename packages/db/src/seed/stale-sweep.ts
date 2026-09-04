@@ -8,9 +8,14 @@
  * ever. So the set that has to be touched is "warmth is not already at rest, **or** there is an
  * interaction still in the window".
  *
- * Measured here at 10,000 contacts × 60 attributes: **156 movable contacts of 10,200**, swept in
- * **27 ms**; 0 ms when the workspace is already fresh; 396 ms to recompute all 10,200 for
- * comparison.
+ * Measured here, and read carefully. At 10,000 perf contacts × 60 attributes the movable set was
+ * **156 of 10,200**, swept in 27 ms — but `generatePerfDataset` creates no interactions, so those
+ * 10,000 are all cold and the 156 are the seed's own active contacts. What that measures is that
+ * cold contacts cost nothing, which is the mechanism working; it is *not* a measurement of 10,000
+ * *active* contacts. The bound that does cover that case is the unscoped recompute: **396 ms**, and
+ * this runs after `listen`, in the background, so even the pathological workspace delays nothing.
+ *
+ * On the seeded development database: 156 contacts, 39 ms.
  *
  * **This is not the shortcut ADR-022 warns about.** That warning is about a contact who goes quiet
  * keeping last year's warmth for ever — and such a contact has `warmth > 0`, so this predicate
