@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "mutuals",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["scripts/dev.mjs"],
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": ["-lc", "unset PORT; exec node scripts/dev.mjs"],
       "port": 3000
     }
   ]
