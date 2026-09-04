@@ -45,6 +45,7 @@ export * from './repositories/attributes.ts'
 export * from './repositories/coerce.ts'
 export * from './repositories/interactions.ts'
 export * from './repositories/records.ts'
+export * from './repositories/views.ts'
 
 // The derived columns of §4.7. `apps/api` recomputes them, scoped, whenever an interaction moves
 // them; the seed and the eventual nightly sweep call the same function unscoped (ADR-092).

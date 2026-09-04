@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { fail, failWith, ok, type CoreIssue, type Result } from '../result.ts'
 import {
   MAX_FIELD_REF_LENGTH,
@@ -84,6 +85,19 @@ function scalar(raw: RawQuery, key: string): Result<string | null> {
 }
 
 /** `field:direction`, e.g. `check_size:desc`. */
+/**
+ * A sort as a saved view *stores* it, which is not how a URL carries it.
+ *
+ * `?sort=` is the string `field:direction` (ADR-032) because a query parameter is a string;
+ * `saved_view.sort` is jsonb because a column is not. Two spellings of one idea, and this is the
+ * one that crosses the wire as an object — `parseSort` and `serializeSort` remain the only bridge
+ * between them.
+ */
+export const sortRequestSchema = z.object({
+  field: z.string().min(1).max(120),
+  direction: z.enum(SORT_DIRECTIONS),
+})
+
 export function parseSort(raw: string): Result<SortRequest> {
   const separator = raw.lastIndexOf(':')
   if (separator <= 0 || separator === raw.length - 1) {

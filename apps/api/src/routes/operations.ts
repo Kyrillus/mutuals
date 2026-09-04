@@ -55,6 +55,12 @@ export const OPERATIONS = [
   'deleteAttributeDefinition',
   'previewDeleteAttributeDefinition',
 
+  // -- Saved views (§6.6) -----------------------------------------------------------------------
+  'listViews',
+  'createView',
+  'updateView',
+  'deleteView',
+
   // -- Dashboard and settings (§6.1, §6.6) ------------------------------------------------------
   'getStats',
   'getProfile',
@@ -72,18 +78,12 @@ export type OperationId = (typeof OPERATIONS)[number]
  * ADR-031's remaining names, kept here so the complete surface stays reviewable while the routes
  * that implement them do not exist yet.
  *
- * - Saved views arrive with Stage 4, the dashboard stage.
- * - The import wizard and merge arrive with Stage 5.
+ * - The import wizard and merge arrive with Stage 5. Saved views left this list in Stage 4.
  */
 export const PLANNED_OPERATIONS = [
   'mergeContacts',
   'previewMergeContacts',
   'mergeOrganizations',
-
-  'listViews',
-  'createView',
-  'updateView',
-  'deleteView',
 
   'createImportBatch',
   'getImportBatch',

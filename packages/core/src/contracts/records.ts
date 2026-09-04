@@ -11,6 +11,8 @@ import { z } from 'zod'
 import { CREATED_VIA_VALUES, FACT_SOURCE_VALUES } from './shared.ts'
 import { AttributesSchema, AttributeValueSchema, AttributeWriteSchema } from './attributes.ts'
 import { CivilDateSchema, IsoDateTimeSchema, ObjectTypeSchema, UuidSchema } from './primitives.ts'
+import { filterSetSchema } from '../filters/model.ts'
+import { sortRequestSchema } from '../filters/query.ts'
 
 /** §4.4's provenance marker: "Imported 12 Mar 2026 from linkedin_connections.csv". */
 export const ProvenanceSchema = z.object({
@@ -173,3 +175,54 @@ export const BulkUpdateAttributeSchema = z.object({
   slug: z.string().min(1).max(63),
   value: z.unknown(),
 })
+
+/**
+ * §6.6's saved views. ADR-048 settles the semantics this shape has to carry: the URL is the working
+ * copy and a view is a named snapshot of `(filters, sort, columns)` loaded into it.
+ *
+ * `columns` is a list of slugs in display order. The migration's comment says `[{slug, width?}]`,
+ * which the implementation never did — widths are not part of a view and `ViewSnapshot` has always
+ * been `string[]`. Recorded rather than corrected, because an applied migration is not edited.
+ */
+export const SavedViewSchema = z.object({
+  id: UuidSchema,
+  objectType: ObjectTypeSchema,
+  name: z.string(),
+  /** What the bare `/contacts` route loads. `sv_default_uq` enforces one per object type. */
+  isDefault: z.boolean(),
+  columns: z.array(z.string()),
+  filters: filterSetSchema,
+  sort: sortRequestSchema.nullable(),
+  position: z.int(),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
+})
+
+export type SavedView = z.output<typeof SavedViewSchema>
+
+export const CreateSavedViewSchema = z.object({
+  objectType: ObjectTypeSchema,
+  name: z.string().trim().min(1).max(120),
+  columns: z.array(z.string()).max(200),
+  filters: filterSetSchema,
+  sort: sortRequestSchema.nullish(),
+  isDefault: z.boolean().optional(),
+})
+
+export type CreateSavedView = z.output<typeof CreateSavedViewSchema>
+
+/**
+ * Every field optional: `Save changes to view` sends the snapshot, and renaming sends only a name.
+ * `objectType` is absent on purpose — a view does not move between object types, and allowing it
+ * would let a contacts view acquire organization columns.
+ */
+export const UpdateSavedViewSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  columns: z.array(z.string()).max(200).optional(),
+  filters: filterSetSchema.optional(),
+  sort: sortRequestSchema.nullish(),
+  isDefault: z.boolean().optional(),
+  position: z.int().optional(),
+})
+
+export const SavedViewListQuerySchema = z.object({ objectType: ObjectTypeSchema.optional() })

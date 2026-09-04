@@ -33,6 +33,7 @@ import { organizationRoutes } from './routes/organizations.ts'
 import { recordRoutes } from './routes/records.ts'
 import { settingsRoutes } from './routes/settings.ts'
 import { stageSixRoutes } from './routes/stage-six.ts'
+import { viewRoutes } from './routes/views.ts'
 
 export const API_PREFIX = '/api/v1'
 export const OPENAPI_ROUTE = `${API_PREFIX}/openapi.json`
@@ -133,6 +134,7 @@ export async function buildApp(ctx: AppContext, options: BuildOptions = {}): Pro
         { name: 'interactions', description: 'Touchpoints — the raw material for warmth (§4.1)' },
         { name: 'follow-ups', description: 'Reminders, with recurrence (§6.4)' },
         { name: 'attributes', description: 'User-defined fields (§4.2, §6.7)' },
+        { name: 'views', description: 'Saved table views (§6.6)' },
         { name: 'dashboard', description: 'Counts and the profile (§6.1, §6.6)' },
         { name: 'agent', description: 'Search, ask and quick capture — Stage 6 (§4.8)' },
       ],
@@ -161,6 +163,7 @@ export async function buildApp(ctx: AppContext, options: BuildOptions = {}): Pro
       await instance.register(followUpRoutes, { ctx })
       await instance.register(attributeDefinitionRoutes, { ctx })
       await instance.register(settingsRoutes, { ctx })
+      await instance.register(viewRoutes, { ctx })
       await instance.register(stageSixRoutes, { ctx })
     },
     { prefix: API_PREFIX },
