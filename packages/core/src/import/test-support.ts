@@ -17,13 +17,27 @@ interface Seed {
   readonly slug: string
   readonly type: AttributeType
   readonly config?: unknown
+  /** `key:Label` pairs, verbatim from migration 0002's `attribute_option` rows. */
+  readonly options?: readonly string[]
 }
 
 /** Verbatim from migration 0002, in its `position` order. */
 const SEEDED_CONTACT_FIELDS: readonly Seed[] = [
   { title: 'Email', slug: 'email', type: 'email' },
   { title: 'Phone', slug: 'phone', type: 'phone' },
-  { title: 'Job role', slug: 'job_role', type: 'single_select' },
+  {
+    title: 'Job role',
+    slug: 'job_role',
+    type: 'single_select',
+    options: [
+      'founder:Founder',
+      'investor:Investor',
+      'operator:Operator',
+      'student:Student',
+      'community_builder:Community Builder',
+      'other:Other',
+    ],
+  },
   {
     title: 'Organization',
     slug: 'organization',
@@ -55,6 +69,19 @@ export function seededContactDefinitions(): readonly AttributeDefinition[] {
         isSystem: false,
         position,
         showByDefault: true,
+        ...(seed.options === undefined
+          ? {}
+          : {
+              options: seed.options.map((entry, index) => {
+                const separator = entry.indexOf(':')
+                return {
+                  id: `opt-${seed.slug}-${String(index)}`,
+                  key: entry.slice(0, separator),
+                  label: entry.slice(separator + 1),
+                  position: index,
+                }
+              }),
+            }),
       },
       TIMESTAMPS,
     ),

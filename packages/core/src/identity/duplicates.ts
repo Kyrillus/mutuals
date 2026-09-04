@@ -53,7 +53,41 @@ export const BAND_THRESHOLDS = { certain: 0.95, probable: 0.8, possible: 0.6 } a
  */
 export const NO_STRONG_IDENTIFIER_CAP = 0.94
 
-export const FUZZY_NAME_THRESHOLD = 0.75
+/**
+ * The similarity `name_fuzzy_org_same` requires — the *scoring* threshold, and 0.65 on measured
+ * evidence rather than the 0.75 that stood here unjustified until Stage 5.
+ *
+ * Measured with `mutuals_norm` and pg_trgm on Postgres 16, over the deliberate collisions in
+ * `fixtures/linkedin_connections_sample.csv` and a set of pairs that are *not* the same person:
+ *
+ * | same person                            |        | different people                  |        |
+ * | -------------------------------------- | ------ | --------------------------------- | ------ |
+ * | Björn Håkansson / Bjoern Hakansson     | 0.7368 | Rüdiger Weiß / Rudiger Weiss jr   | 0.8235 |
+ * | Ekaterina Volkova / Ekatarina Volkova  | 0.7143 | Wei Zhang / Wei Zhao              | 0.5833 |
+ * | Lukas Müller / Lukas Mueller           | 0.6875 | Jan Müller / Jan Möller           | 0.5714 |
+ * | Jonas Weber / J. Weber                 | 0.5385 | Anna Berger / Anna Bergmann       | 0.5625 |
+ *
+ * Two things follow. There is an empty gap between 0.5833 and 0.6875, so 0.65 admits three true
+ * pairs and no new false one — whereas 0.75 sat *above* two duplicates the fixture was built to
+ * contain. And the highest score in the table is a false positive, so no threshold separates these
+ * sets on similarity alone: this rule additionally requires the same organisation, and its
+ * confidence of 0.74 lands in `possible`, where §14's Q4 has the user asked rather than the row
+ * silently skipped. A false positive therefore costs one question; a miss costs a duplicate contact,
+ * which is the failure the wizard exists to prevent.
+ */
+export const FUZZY_NAME_THRESHOLD = 0.65
+
+/**
+ * The similarity a record needs to enter the candidate pool at all — the *generation* threshold.
+ *
+ * Deliberately below every scoring rule, because generation asks "who could this be" and scoring
+ * decides. Using one number for both made `name_initial_org_same` unreachable in production: "Jonas
+ * Weber" and "J. Weber" score 0.5385, so the candidate never arrived and `isInitialForm` — which
+ * exists for exactly that case, and is unit-tested — could never run. Below 0.45 the pool starts
+ * filling with people who merely share a first name (0.3889 for two siblings), which costs the
+ * scan without ever changing a verdict.
+ */
+export const NAME_CANDIDATE_THRESHOLD = 0.45
 
 export const MAX_MATCHES = 5
 

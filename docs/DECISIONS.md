@@ -2977,29 +2977,86 @@ test. Session A also absorbs find-or-create for organizations, which nothing in
 `packages/db/src/write/` does and which the LinkedIn preset requires in order to link with
 `title = Position` and `from = Connected On`. Session B is then §6.9 alone, and the three merge names
 stay in `PLANNED_OPERATIONS` through Session A.
-
 **The acceptance test's numbers are wrong, and the handover repeats them.**
 `e2e/specs/import-linkedin-csv.spec.ts` says _"the fixture holds two deliberate collisions"_ and
 _"The file holds 6 data rows; two pairs collapse to one contact each, so 4 contacts land"_, and
-asserts `Rows: 4`. Measured, by parsing the fixture and running the real `matchDuplicates` over it:
+asserts `Rows: 4`. Measured end to end — the real CSV reader, the real auto-mapper, `mutuals_norm`
+from Postgres 16 and the real matcher, over an empty workspace:
 
-| row | contact           | matches | band       | confidence | rule                                 |
-| --- | ----------------- | ------- | ---------- | ---------- | ------------------------------------ |
-| 2   | Anna Berger       | 1       | `certain`  | 0.970      | `identifier` (same email)            |
-| 4   | Bjoern Hakansson  | 3       | `certain`  | 0.990      | `identifier` (same LinkedIn profile) |
-| 8   | Marta Nowak       | 7       | `probable` | 0.880      | `name_exact_org_same`                |
-| 12  | Ekatarina Volkova | 11      | `possible` | 0.740      | `name_fuzzy_org_same`                |
-| 15  | Lukas Mueller     | 14      | `possible` | 0.740      | `name_fuzzy_org_same`                |
+| row | contact           | duplicate of | band       | confidence | rule                                 |
+| --- | ----------------- | ------------ | ---------- | ---------- | ------------------------------------ |
+| 2   | Anna Berger       | row 1        | `certain`  | 0.970      | `identifier` — same email            |
+| 4   | Bjoern Hakansson  | row 3        | `certain`  | 0.990      | `identifier` — same LinkedIn profile |
+| 8   | Marta Nowak       | row 7        | `probable` | 0.880      | `name_exact_org_same`                |
+| 10  | J. Weber          | row 9        | `possible` | 0.700      | `name_initial_org_same`              |
+| 12  | Ekatarina Volkova | row 11       | `possible` | 0.740      | `name_fuzzy_org_same`                |
+| 15  | Lukas Mueller     | row 14       | `possible` | 0.740      | `name_fuzzy_org_same`                |
 
-**31 data rows, not 6. Five pairs, not two** — six once the real candidate query runs, since Jonas
-Weber / J. Weber needs `pg_trgm` to enter the pool at all and then lands on
-`name_initial_org_same`. The fixture is markedly better than the test that was written against it,
-and carries four edge cases the comment never mentions: a multiline quoted `Position`, an empty
-`First Name`, `not-an-email`, and an empty `Company`. Two further corrections. The spec reasons that
-the Håkansson pair is _"a fuzzy match, not an exact one"_, which is wrong on §4.6's own terms — they
-share a `linkedin_url` exactly, and the matcher agrees at 0.990. And the spec assumes the exact
-duplicate is _"preselected to merge"_, which **Q4 overruled**: nothing is pre-decided, the user is
-asked, and not importing is the default. The Marta Nowak pair, built to exercise `emailMatchKey`'s
-gmail dot-and-plus folding, correctly lands `probable` rather than `certain`, because that key is a
-duplicate signal and never a stored identifier (ADR-042), so the ≥0.95-single-identifier gate caps
-it. The rewritten test asserts these numbers.
+**31 data rows, not 6. Six pairs, not two. One error row** — `not-an-email` — and therefore **24
+contacts land** when every flagged row is skipped, not 4. Every pair is row-against-row inside the
+file, which is what ADR-097 exists for. The fixture is markedly better than the test written against
+it, and carries four edge cases the comment never mentions: a multiline quoted `Position`, an empty
+`First Name`, `not-an-email`, and an empty `Company`. That the system finds exactly the six
+collisions its author built is the strongest evidence available that ADR-099's threshold is right.
+
+Two further corrections. The spec reasons that the Håkansson pair is _"a fuzzy match, not an exact
+one"_, which is wrong on §4.6's own terms — they share a `linkedin_url` exactly, and the matcher
+agrees at 0.990. And the spec assumes the exact duplicate is _"preselected to merge"_, which **Q4
+overruled**: nothing is pre-decided, the user is asked, and not importing is the default. The Marta
+Nowak pair, built to exercise `emailMatchKey`'s gmail dot-and-plus folding, correctly lands
+`probable` rather than `certain`, because that key is a duplicate signal and never a stored
+identifier (ADR-042), so the ≥0.95-single-identifier gate caps it. The rewritten test asserts these
+numbers.
+
+_An earlier version of this ADR reported five pairs, scored with a bigram stand-in for
+`similarity()` rather than with Postgres. Corrected here rather than quietly: the stand-in agreed on
+the two identifier pairs and disagreed on every fuzzy one, which is exactly the failure mode that
+made pinning the trigram implementation against Postgres worth doing._
+
+### ADR-099 — The fuzzy name threshold is measured, and candidate generation is not the same number
+
+**Context.** `FUZZY_NAME_THRESHOLD = 0.75` had stood in `packages/core` since Stage 1 with no
+comment and no justification, used in exactly one place: the `name_fuzzy_org_same` rule. Stage 5
+gave it its first real data, because the LinkedIn fixture contains six deliberate collisions and the
+system found three of them.
+
+**Options.** (1) Leave 0.75 and record that three of the fixture's collisions are undetectable.
+(2) Lower the scoring threshold on measured evidence. (3) Lower it **and** separate the threshold
+that generates candidates from the one that scores them.
+
+**Choice.** Option 3. `FUZZY_NAME_THRESHOLD` becomes **0.65**, and a new
+`NAME_CANDIDATE_THRESHOLD` of **0.45** governs which records enter the pool at all.
+
+**The measurement.** `mutuals_norm` and `similarity()` on Postgres 16, over the fixture's collisions
+and a set of pairs that are deliberately _not_ the same person:
+
+| same person                           |            | different people                |            |
+| ------------------------------------- | ---------- | ------------------------------- | ---------- |
+| Björn Håkansson / Bjoern Hakansson    | 0.7368     | Rüdiger Weiß / Rudiger Weiss jr | **0.8235** |
+| Ekaterina Volkova / Ekatarina Volkova | 0.7143     | Wei Zhang / Wei Zhao            | 0.5833     |
+| Lukas Müller / Lukas Mueller          | 0.6875     | Jan Müller / Jan Möller         | 0.5714     |
+| Jonas Weber / J. Weber                | **0.5385** | Anna Berger / Anna Bergmann     | 0.5625     |
+
+**Consequences.** Three things follow, and only the first is a tuning decision.
+
+There is an **empty gap between 0.5833 and 0.6875**, so 0.65 admits three true pairs and no new
+false one — while 0.75 sat _above_ two collisions the fixture was built to contain. The rule also
+requires the same organisation, and its confidence of 0.74 lands in `possible`, where Q4 has the
+user asked rather than the row silently skipped. A false positive therefore costs one question and a
+miss costs a duplicate contact, which is the failure the wizard exists to prevent.
+
+**No threshold separates these two sets**: the highest similarity in the table is a false positive.
+That is not an argument for keeping 0.75 — it is the reason the fallback is a rule table rather than
+a score, and the reason `name_exact_org_diff` exists to be scored at 0.30 and never shown.
+
+And the part that was a **bug rather than a setting**: using one number for both jobs made
+`name_initial_org_same` unreachable in production. "J. Weber" scores 0.5385 against "Jonas Weber",
+so the candidate never entered the pool and `isInitialForm` — which exists for exactly that case,
+and is unit-tested — could never run. Core's own tests could not catch it, because they hand
+`matchDuplicates` a pool directly; it took the database half existing for the gap to become visible.
+Generation now asks "who could this be" and scoring decides, which is what ADR-042 already
+described in prose.
+
+This changes matching for the whole product, not only for the import: Session B's merge and Stage
+6's quick capture call the same function. That is intended — it is the same improvement — and it is
+why the numbers live in a comment beside the constant rather than only here.

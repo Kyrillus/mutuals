@@ -68,11 +68,12 @@ cap defaults to **$2.00/day** and nobody has confirmed that number. Ask when the
 not before.
 
 **Everything Stage 5 needs is settled — but four things were settled _after_ this file was first
-written, and they are in §16 of `docs/DECISIONS.md` rather than above.** Read ADR-095 to ADR-098
+written, and they are in §16 of `docs/DECISIONS.md` rather than above.** Read ADR-095 to ADR-099
 before starting Stage 5. In short: the pg-boss pooler test ships skipped and R7 stays open (095);
 CSV and XLSX land in Stage 5 and vCard does not (096); duplicates inside a single file get their own
-row pointer in migration 0009 (097); and **the session split below changed** — Session A owns §6.8
-entire, including duplicate detection, and the acceptance test's numbers were wrong (098).
+row pointer in migration 0009 (097); **the session split below changed** — Session A owns §6.8
+entire, including duplicate detection, and the acceptance test's numbers were wrong (098); and the
+fuzzy name threshold was measured and moved, with candidate generation split from scoring (099).
 
 **Q4** (Simon, 2026-09-04): a near-certain duplicate is **not** silently pre-decided.
 The row is flagged and the user is asked in as many words — _"this looks like a contact you already
@@ -163,7 +164,7 @@ Traps that already cost time once each, all now guarded but worth knowing:
 Paste this as the first message of the new session:
 
 > Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §6.8, §6.9 and §4.6, then
-> `docs/DECISIONS.md` **§16** — ADR-095 to ADR-098, settled after this file was first written,
+> `docs/DECISIONS.md` **§16** — ADR-095 to ADR-099, settled after this file was first written,
 > and they change the split below and the acceptance test's numbers.
 >
 > Build **Stage 5 — the import wizard, duplicate detection and merge**. It is the largest stage left
@@ -204,11 +205,11 @@ Paste this as the first message of the new session:
 >
 > **`e2e/specs/import-linkedin-csv.spec.ts` is the acceptance test**, it is written as `fixme`, and
 > **its numbers are wrong** — ADR-098 has the measurement. It claims 6 data rows and two collisions;
-> the fixture holds **31 data rows and five detectable pairs** (six once `pg_trgm` is in play), and
-> its comment mis-classifies the Håkansson pair as fuzzy when the two rows share a `linkedin_url`
-> exactly. It also assumes the exact duplicate is preselected to merge, which Q4 overruled. Rewrite
-> it against ADR-098's table rather than un-`fixme`-ing it, and it becomes green at the end of
-> Session A, not Session B.
+> the fixture holds **31 data rows, six duplicate pairs and one error row**, so **24 contacts land**
+> when every flagged row is skipped. Its comment also mis-classifies the Håkansson pair as fuzzy
+> when the two rows share a `linkedin_url` exactly, and it assumes the exact duplicate is
+> preselected to merge, which Q4 overruled. Rewrite it against ADR-098's table rather than
+> un-`fixme`-ing it, and it becomes green at the end of Session A, not Session B.
 >
 > Everything goes on `version/claude-v1` and therefore into PR #1 (ADR-089). **Still do not merge it.**
 >

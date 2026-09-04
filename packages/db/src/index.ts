@@ -44,6 +44,7 @@ export type { AttributeShape, Executor, Provenance } from './write/types.ts'
 export * from './repositories/attributes.ts'
 export * from './repositories/coerce.ts'
 export * from './repositories/interactions.ts'
+export * from './repositories/duplicates.ts'
 export * from './repositories/records.ts'
 export * from './repositories/views.ts'
 

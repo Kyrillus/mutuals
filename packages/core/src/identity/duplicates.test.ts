@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  FUZZY_NAME_THRESHOLD,
   MAX_COMBINED_CONFIDENCE,
+  NAME_CANDIDATE_THRESHOLD,
   NO_STRONG_IDENTIFIER_CAP,
   bandFor,
   describeBand,
@@ -276,10 +278,30 @@ describe('the name fallback', () => {
     const verdict = matchDuplicates(
       { ...ANNA, identifiers: [], nameKey: 'andreas berger' },
       pool({
-        nameCandidates: [{ ...base, nameSimilarity: 0.74, organizationIds: ['org-northstar'] }],
+        nameCandidates: [
+          {
+            ...base,
+            // Derived, not pinned: this test asserted 0.74 was below the threshold, which stopped
+            // being true when Stage 5 measured the threshold and moved it to 0.65.
+            nameSimilarity: FUZZY_NAME_THRESHOLD - 0.01,
+            organizationIds: ['org-northstar'],
+          },
+        ],
       }),
     )
     expect(verdict.best).toBeNull()
+  })
+
+  /**
+   * The candidate below has a similarity far under every scoring threshold, and the rule still
+   * fires — which is the point of `isInitialForm`, and also why a test that hands `matchDuplicates`
+   * a pool directly cannot tell whether the pool would ever have contained it. Generation is what
+   * decides that, and it lives in `packages/db`; `NAME_CANDIDATE_THRESHOLD` is what keeps the two
+   * from being the same number.
+   */
+  it('reaches the initial-form rule from a similarity no scoring rule would accept', () => {
+    expect(0.5).toBeLessThan(FUZZY_NAME_THRESHOLD)
+    expect(0.5).toBeGreaterThan(NAME_CANDIDATE_THRESHOLD)
   })
 
   it('recognises an abbreviated first name at the same organisation', () => {
