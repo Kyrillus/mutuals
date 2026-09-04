@@ -102,7 +102,11 @@ const IDENTIFIER_KINDS = [
 ] as const
 const FOLLOW_UP_STATUSES = ['Open', 'Done', 'Snoozed'] as const
 const FOLLOW_UP_ORIGINS = ['manual', 'system'] as const
-const IMPORT_STATUSES = [
+/**
+ * The state machine the wizard polls and the Resume button reads (§6.8, ADR-061). Exported because
+ * `apps/api` moves a batch through it and a stringly-typed status would let it write "reviewed".
+ */
+export const IMPORT_STATUSES = [
   'parsing',
   'mapping',
   'reviewing',
@@ -110,7 +114,11 @@ const IMPORT_STATUSES = [
   'completed',
   'failed',
 ] as const
-const IMPORT_DECISIONS = ['skip', 'merge', 'create'] as const
+export type ImportStatus = (typeof IMPORT_STATUSES)[number]
+
+/** §6.8 step 4's per-row choice for a flagged duplicate. */
+export const IMPORT_DECISIONS = ['skip', 'merge', 'create'] as const
+export type ImportDecision = (typeof IMPORT_DECISIONS)[number]
 const LLM_TASK_KINDS = ['extraction', 'question', 'summary', 'embedding'] as const
 const LLM_STATUSES = [
   'ok',

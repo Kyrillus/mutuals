@@ -31,6 +31,7 @@ export * from './filter/sort.ts'
 // The write path. Every mutation goes through these; nothing writes `attribute_value` by hand.
 export * from './write/facts.ts'
 export * from './write/identifiers.ts'
+export * from './write/organizations.ts'
 export * from './write/records.ts'
 export * from './write/value-key.ts'
 export * from './write/workspace.ts'
@@ -40,11 +41,17 @@ export * from './write/workspace.ts'
 export { WriteError } from './write/types.ts'
 export type { AttributeShape, Executor, Provenance } from './write/types.ts'
 
+// Background jobs: the three-method port (ADR-058) and its only implementation. Nothing outside
+// `jobs/pg-boss.ts` imports pg-boss, which is what makes R7's mitigation real.
+export * from './jobs/queue.ts'
+export * from './jobs/pg-boss.ts'
+
 // Repositories: a database row in, a domain object out.
 export * from './repositories/attributes.ts'
 export * from './repositories/coerce.ts'
 export * from './repositories/interactions.ts'
 export * from './repositories/duplicates.ts'
+export * from './repositories/imports.ts'
 export * from './repositories/records.ts'
 export * from './repositories/views.ts'
 
