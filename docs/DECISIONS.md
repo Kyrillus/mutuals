@@ -2484,11 +2484,10 @@ records from a bulk action the user may click through); (c) pre-select nothing a
 already specified; a tested toggle plus dark screenshots in every stage report is about half a day.
 Recommendation: **tokens now, toggle in Stage 7**.
 
-**Q6 — Overnight jobs on a laptop (Simon).** The nightly warmth sweep is scheduled for 03:30, and the
-app will usually be closed then. Options: **(a)** on startup, if the sweep is more than 20 hours
-stale, run it once in the background (recommended — warmth is then at most a day out of date, which is
-about 1% on a 90-day decay and invisible in a 0–100 score); (b) run it on every startup; (c) only ever
-on the schedule, and accept that warmth is stale whenever the app has been closed for a while.
+**Q6 — Overnight jobs on a laptop (Simon). Answered 2026-09-04 — ADR-093.** He chose (a), run it
+at startup when stale, on the condition that it is cheap. It is: 27 ms for the 156 contacts of
+10,000 whose warmth can still move, and 0 ms when nothing is stale. It runs after the API is already
+serving, so it delays no request.
 
 **Q7 — LLM spending cap (Simon).** `LLM_DAILY_COST_LIMIT_USD` defaults to **$2.00/day**, enforced
 before every request to the model provider; past it, AI features return a clear "daily limit reached"
@@ -2712,7 +2711,17 @@ pins `today`". For end-to-end determinism the suite uses `page.clock.setFixedTim
 `Date` inside the browser and therefore freezes `ambientDisplay()` without the application knowing.
 
 **Consequences.** Option 2 is a test door in production code, which ADR-079 already refused once for
-the database reset; refusing it again for the clock is the same argument. Option 1 couples rendering
+the database reset; refusing it again for the clock is the same argument.
+
+**Corrected in Stage 4, by a test that failed.** The paragraph above said Playwright's clock gives
+"end-to-end determinism". It does not: `page.clock` freezes `Date` **inside the browser** and the API
+keeps its own. So anything the server derives — a follow-up's `state`, the date of the next
+occurrence a recurring follow-up spawns — is still computed against the server's real today, and a
+spec that pins the browser clock and then asserts a literal server-derived date is asserting what day
+the machine thinks it is. `page.clock` makes _rendering_ deterministic and nothing else. The
+follow-up spec now asserts the promise §4.1 actually makes — the series continues, one done and one
+open, the open one later — rather than a date. Pinning the server's clock too would need the test
+door this ADR exists to refuse. Option 1 couples rendering
 a relative date to a round trip and still would not make a test deterministic. The rule this ADR
 states, and which review should enforce: **anything the domain decides — warmth, whether a follow-up
 is overdue, when the next occurrence falls — is computed server-side against the injected clock and
@@ -2756,3 +2765,41 @@ The scope is the point, not an optimisation detail. Recomputing 10,000 contacts 
 warmth is the same shape of mistake as the missing cascade indexes that made deleting a contact take
 four seconds in Stage 1. A scoped run also deliberately does **not** stamp `workspace.metrics_swept_at`,
 so Stage 4's nightly job cannot mistake one logged call for a sweep.
+
+### ADR-093 — Warmth catches up at startup when it is stale, scoped to what can move (answers Q6)
+
+**Context.** §14's Q6: the nightly warmth sweep is scheduled for 03:30 and the laptop is usually shut
+then. Put to Simon on 2026-09-04, he chose "at startup when stale" **conditional on it being cheap** —
+his words: "ich hab angst dass die app langsam wird". That condition is the decision.
+
+**Options.** (a) On startup if the last sweep is more than 20 hours old. (b) On every startup.
+(c) Only on the schedule, and accept staleness.
+
+**Choice.** (a), scoped, and **after `listen`** so the API is already serving before it begins. A slow
+sweep can therefore delay nothing; the worst case is warmth that is briefly a few hours out of date.
+
+**Why it is cheap enough to be allowed.** Warmth changes on its own only where `computeWarmth` would
+return something different tomorrow, and its only time-dependent input is decay on interactions
+inside the window. A contact at 0 with nothing in the window is at a fixed point. So the sweep
+touches "warmth is not already at rest, **or** there is an interaction still in the window".
+
+Measured on this machine, 10,000 contacts × 60 attributes:
+
+|                                        |                                   |
+| -------------------------------------- | --------------------------------- |
+| Movable contacts                       | **156** of 10,200                 |
+| Sweep when stale                       | **27 ms**                         |
+| Sweep when already fresh               | **0 ms** (one predicate, no work) |
+| Recomputing all 10,200, for comparison | 396 ms                            |
+
+**This is not the shortcut ADR-022 warns about.** That warning — written into `recomputeMetrics`'s own
+docstring — is about a contact who goes quiet keeping last year's warmth for ever. Such a contact has
+`warmth > 0`, so this predicate keeps recomputing them every day until they reach 0, which is the
+correct resting value. What is skipped is only contacts already at it.
+
+**Consequences.** The window is `WARMTH_WINDOW_DAYS + 1`: on the day a contact's last interaction
+falls out of the window their score becomes 0, and a boundary excluding them that morning would
+freeze them at yesterday's number. A failed sweep is logged at `warn` and swallowed — warmth a few
+hours stale is a better day than an API that would not start. Option (b) was rejected on Simon's own
+grounds: the app is opened many times a day and nine of those ten openings would do nothing but
+work. Stage 4's scheduled sweep, when it exists, calls the same function unscoped.

@@ -12,7 +12,8 @@ talked to.
 
 ## Where the work stopped
 
-**Stages 1, 2 and 3 are done.** All three live in
+**Stages 1, 2 and 3 are done. Stage 4 is half done** — follow-ups and the dashboard have landed;
+saved views are what remains. Everything lives in
 [PR #1](https://github.com/Kyrillus/mutuals/pull/1), which grew to cover them together and was
 retitled — see ADR-089 for why, and why that was Simon's call rather than a default.
 
@@ -27,8 +28,12 @@ retitled — see ADR-089 for why, and why that was Simon's call rather than a de
 UI, §6.5's contact detail page with its four tabs, interactions CRUD, and §4.5's value-history
 popover — the first screen that reads the append-only log.
 
+**Stage 4, session A** added §6.4's follow-ups — the page with its quick-filter tabs, create/edit,
+mark done, snooze, and the Follow-ups tab on a contact — plus §6.1's dashboard: the four stat cards,
+"Needs your attention" and the recently-interacted list. Q6 is answered and shipped (ADR-093).
+
 `pnpm verify` is green: 1,160 unit tests, 311 integration tests, lint, typecheck and build clean.
-`pnpm verify:e2e` is green: 12 specs, 2 `fixme`.
+`pnpm verify:e2e` is green: 14 specs, 1 `fixme` (the LinkedIn import, Stage 5).
 
 **Do not merge PR #1.** `main` has moved on — another session built a getmutuals.ai waitlist site in
 `site/`, which this branch never touches. Merging PR #1 today would delete the old German Next.js
@@ -54,8 +59,8 @@ questions in `docs/DECISIONS.md` §14; they are repeated here because they are e
 - **Simon has approved how the app looks.** He ran it and said so. Do not redesign the shell.
 
 Still open, none of them blocking, all in `docs/DECISIONS.md` §14 with a recommendation:
-**Q4** (what is preselected for a near-certain duplicate in the import review grid — Stage 5),
-**Q6** (the nightly warmth sweep on a laptop that is asleep at 03:30 — Stage 4).
+**Q4** (what is preselected for a near-certain duplicate in the import review grid — Stage 5).
+**Q6 is answered**: ADR-093, and it is built.
 
 ## The environment, exactly
 
@@ -92,6 +97,10 @@ Four traps that already cost time once each, all now guarded but worth knowing:
   import time. `apps/web/scripts/build.mjs` handles it and asserts its own output.
 - **`pnpm db:check`** generates 10,000 contacts × 60 attributes and takes about 80 seconds. It is the
   performance harness, not part of `verify`.
+- **`page.clock` pins the browser's clock only.** The API keeps its own, so anything the server
+  derives — a follow-up's `state`, the date of a recurrence's next occurrence — is still computed
+  against the real today. Asserting a literal server-derived date in an e2e spec asserts what day
+  the machine thinks it is. ADR-091 has the corrected version; a test found this the hard way.
 - **Radix tabs and popovers do not respond to synthetic `.click()`.** Driving the app through
   `javascript_tool` will silently fail on them; Playwright sends real pointer events and does not.
   Verify anything tab- or popover-shaped through the e2e suite rather than through the dev console.
@@ -100,33 +109,36 @@ Four traps that already cost time once each, all now guarded but worth knowing:
 
 Paste this as the first message of the new session:
 
-> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §6.1, §6.4 and §6.6.
+> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §5.2 and §6.6.
 >
-> Build **Stage 4 — Follow-ups, the dashboard and saved views**:
+> Build **Stage 4, session B — saved views**, which closes the stage.
 >
-> 1. **Follow-ups** (§6.4): the table, recurrence, snooze, and marking done. The domain is already
->    built and unit-tested in `packages/core` — completing a recurring follow-up creates the next
->    occurrence, and `PATCH /follow-ups/:id` already returns it as `next`. What is missing is the
->    screen. The contact detail page has a Follow-ups tab that is currently a sentence.
-> 2. **The dashboard** (§6.1): the four stat cards, "Needs your attention", and the recently
->    interacted list. `GET /stats` exists and the page is a stub.
-> 3. **Saved views** (§6.6): a view is a named set of columns, filters and sort. ADR-047 already put
->    the working copy in the URL and `retainSearchParams(['view'])` rides along — what is missing is
->    persistence and the `⋮` menu of §5.2. `listViews`/`createView`/`updateView`/`deleteView` are
->    already named in `PLANNED_OPERATIONS`; move them to `OPERATIONS` rather than inventing names.
-> 4. **Finish `e2e/specs/interaction-and-follow-up.spec.ts`.** The interaction half is a real test;
->    the follow-up half is still `fixme` with its assertions written. ADR-091 settles how the clock
->    is pinned: `page.clock.setFixedTime()`, not a hook in the app.
-> 5. **Q6 needs Simon** (`docs/DECISIONS.md` §14): the nightly warmth sweep on a laptop that is
->    asleep at 03:30. ADR-092 made the _scoped_ recompute happen on write, so this is now only about
->    decay over time — which makes the "recompute on read if stale" option cheaper than it was when
->    the question was written. Put it to him with that update.
+> A view is a named set of visible columns, their order, filters and sort (§5.2, §6.6). Most of the
+> machinery exists and the job is mostly reconciliation, not construction:
 >
-> Everything goes on `version/claude-v1` and therefore into PR #1, which now covers Stages 1–4
-> (ADR-089). **Still do not merge it.**
+> 1. **The working copy is already in the URL** (ADR-047), and `retainSearchParams(['view'])` already
+>    carries `?view=` through every navigation (ADR-048). `serializeListQuery` is already canonical
+>    and ADR-048 already says dirtiness is deep equality over exactly its output — so there is one
+>    canonicalisation to compare against, not two.
+> 2. **The operations are already named**: `listViews`, `createView`, `updateView`, `deleteView` sit
+>    in `PLANNED_OPERATIONS` in `apps/api/src/routes/operations.ts`. Move them to `OPERATIONS` rather
+>    than inventing names — `operations.test.ts` asserts the two arrays stay disjoint.
+> 3. **What is missing** is persistence, the `⋮` menu of §5.2 (`Save changes to view`, `Save as new
+view`, `Revert changes`, `Table settings`), and the breadcrumb reading `Contacts › Investors in
+Munich`. §6.2 also names four seeded views, and the seed already creates five contact views and
+>    one organization view — check what is there before adding more.
+> 4. **The hard part is the state machine**, and it is worth designing before typing: the URL holds a
+>    working copy, the saved view holds a baseline, and the UI has to say which is showing, whether
+>    they differ, and what each menu item does in each case. Get that on paper first.
+> 5. **`routes/settings/-components/table-views.tsx`** is currently an empty state explaining that
+>    views are Stage 4. It is where the management screen goes.
 >
-> Verify by running things, not by reading them. An agent's self-report is not evidence: the browser
-> and the database are. `pnpm verify:full` is the gate. Report back in the two layers §0 requires.
+> Closing the stage: update `docs/PLAN.md`, `CLAUDE.md`'s stage marker and `README.md`, then retitle
+> PR #1 and rewrite its body to cover Stages 1–4. Everything is on `version/claude-v1` and therefore
+> in PR #1 (ADR-089). **Still do not merge it.**
+>
+> Verify by running things, not by reading them. `pnpm verify:full` is the gate. Report back in the
+> two layers §0 requires.
 
 ## How the two people want to be talked to
 
