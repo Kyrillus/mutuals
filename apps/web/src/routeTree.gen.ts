@@ -15,7 +15,15 @@ import { Route as FollowUpsRouteImport } from './routes/follow-ups'
 import { Route as OrganizationsRouteImport } from './routes/organizations'
 import { Route as SettingsRouteRouteImport } from './routes/settings/route'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as SettingsContactsRouteRouteImport } from './routes/settings/contacts/route'
+import { Route as SettingsOrganizationsRouteRouteImport } from './routes/settings/organizations/route'
 import { Route as SettingsProfileRouteImport } from './routes/settings/profile'
+import { Route as SettingsContactsIndexRouteImport } from './routes/settings/contacts/index'
+import { Route as SettingsContactsAttributesRouteImport } from './routes/settings/contacts/attributes'
+import { Route as SettingsContactsViewsRouteImport } from './routes/settings/contacts/views'
+import { Route as SettingsOrganizationsIndexRouteImport } from './routes/settings/organizations/index'
+import { Route as SettingsOrganizationsAttributesRouteImport } from './routes/settings/organizations/attributes'
+import { Route as SettingsOrganizationsViewsRouteImport } from './routes/settings/organizations/views'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -47,11 +55,56 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SettingsRouteRoute,
 } as any)
+const SettingsContactsRouteRoute = SettingsContactsRouteRouteImport.update({
+  id: '/contacts',
+  path: '/contacts',
+  getParentRoute: () => SettingsRouteRoute,
+} as any)
+const SettingsOrganizationsRouteRoute =
+  SettingsOrganizationsRouteRouteImport.update({
+    id: '/organizations',
+    path: '/organizations',
+    getParentRoute: () => SettingsRouteRoute,
+  } as any)
 const SettingsProfileRoute = SettingsProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
   getParentRoute: () => SettingsRouteRoute,
 } as any)
+const SettingsContactsIndexRoute = SettingsContactsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsContactsRouteRoute,
+} as any)
+const SettingsContactsAttributesRoute =
+  SettingsContactsAttributesRouteImport.update({
+    id: '/attributes',
+    path: '/attributes',
+    getParentRoute: () => SettingsContactsRouteRoute,
+  } as any)
+const SettingsContactsViewsRoute = SettingsContactsViewsRouteImport.update({
+  id: '/views',
+  path: '/views',
+  getParentRoute: () => SettingsContactsRouteRoute,
+} as any)
+const SettingsOrganizationsIndexRoute =
+  SettingsOrganizationsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => SettingsOrganizationsRouteRoute,
+  } as any)
+const SettingsOrganizationsAttributesRoute =
+  SettingsOrganizationsAttributesRouteImport.update({
+    id: '/attributes',
+    path: '/attributes',
+    getParentRoute: () => SettingsOrganizationsRouteRoute,
+  } as any)
+const SettingsOrganizationsViewsRoute =
+  SettingsOrganizationsViewsRouteImport.update({
+    id: '/views',
+    path: '/views',
+    getParentRoute: () => SettingsOrganizationsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -59,8 +112,16 @@ export interface FileRoutesByFullPath {
   '/contacts': typeof ContactsRoute
   '/follow-ups': typeof FollowUpsRoute
   '/organizations': typeof OrganizationsRoute
+  '/settings/contacts': typeof SettingsContactsRouteRouteWithChildren
+  '/settings/organizations': typeof SettingsOrganizationsRouteRouteWithChildren
   '/settings/profile': typeof SettingsProfileRoute
   '/settings/': typeof SettingsIndexRoute
+  '/settings/contacts/attributes': typeof SettingsContactsAttributesRoute
+  '/settings/contacts/views': typeof SettingsContactsViewsRoute
+  '/settings/organizations/attributes': typeof SettingsOrganizationsAttributesRoute
+  '/settings/organizations/views': typeof SettingsOrganizationsViewsRoute
+  '/settings/contacts/': typeof SettingsContactsIndexRoute
+  '/settings/organizations/': typeof SettingsOrganizationsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -69,6 +130,12 @@ export interface FileRoutesByTo {
   '/organizations': typeof OrganizationsRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/settings': typeof SettingsIndexRoute
+  '/settings/contacts/attributes': typeof SettingsContactsAttributesRoute
+  '/settings/contacts/views': typeof SettingsContactsViewsRoute
+  '/settings/organizations/attributes': typeof SettingsOrganizationsAttributesRoute
+  '/settings/organizations/views': typeof SettingsOrganizationsViewsRoute
+  '/settings/contacts': typeof SettingsContactsIndexRoute
+  '/settings/organizations': typeof SettingsOrganizationsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,8 +144,16 @@ export interface FileRoutesById {
   '/contacts': typeof ContactsRoute
   '/follow-ups': typeof FollowUpsRoute
   '/organizations': typeof OrganizationsRoute
+  '/settings/contacts': typeof SettingsContactsRouteRouteWithChildren
+  '/settings/organizations': typeof SettingsOrganizationsRouteRouteWithChildren
   '/settings/profile': typeof SettingsProfileRoute
   '/settings/': typeof SettingsIndexRoute
+  '/settings/contacts/attributes': typeof SettingsContactsAttributesRoute
+  '/settings/contacts/views': typeof SettingsContactsViewsRoute
+  '/settings/organizations/attributes': typeof SettingsOrganizationsAttributesRoute
+  '/settings/organizations/views': typeof SettingsOrganizationsViewsRoute
+  '/settings/contacts/': typeof SettingsContactsIndexRoute
+  '/settings/organizations/': typeof SettingsOrganizationsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -88,8 +163,16 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/follow-ups'
     | '/organizations'
+    | '/settings/contacts'
+    | '/settings/organizations'
     | '/settings/profile'
     | '/settings/'
+    | '/settings/contacts/attributes'
+    | '/settings/contacts/views'
+    | '/settings/organizations/attributes'
+    | '/settings/organizations/views'
+    | '/settings/contacts/'
+    | '/settings/organizations/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -98,6 +181,12 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/settings/profile'
     | '/settings'
+    | '/settings/contacts/attributes'
+    | '/settings/contacts/views'
+    | '/settings/organizations/attributes'
+    | '/settings/organizations/views'
+    | '/settings/contacts'
+    | '/settings/organizations'
   id:
     | '__root__'
     | '/'
@@ -105,8 +194,16 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/follow-ups'
     | '/organizations'
+    | '/settings/contacts'
+    | '/settings/organizations'
     | '/settings/profile'
     | '/settings/'
+    | '/settings/contacts/attributes'
+    | '/settings/contacts/views'
+    | '/settings/organizations/attributes'
+    | '/settings/organizations/views'
+    | '/settings/contacts/'
+    | '/settings/organizations/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -161,6 +258,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof SettingsRouteRoute
     }
+    '/settings/contacts': {
+      id: '/settings/contacts'
+      path: '/contacts'
+      fullPath: '/settings/contacts'
+      preLoaderRoute: typeof SettingsContactsRouteRouteImport
+      parentRoute: typeof SettingsRouteRoute
+    }
+    '/settings/organizations': {
+      id: '/settings/organizations'
+      path: '/organizations'
+      fullPath: '/settings/organizations'
+      preLoaderRoute: typeof SettingsOrganizationsRouteRouteImport
+      parentRoute: typeof SettingsRouteRoute
+    }
     '/settings/profile': {
       id: '/settings/profile'
       path: '/profile'
@@ -168,15 +279,96 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsProfileRouteImport
       parentRoute: typeof SettingsRouteRoute
     }
+    '/settings/contacts/': {
+      id: '/settings/contacts/'
+      path: '/'
+      fullPath: '/settings/contacts/'
+      preLoaderRoute: typeof SettingsContactsIndexRouteImport
+      parentRoute: typeof SettingsContactsRouteRoute
+    }
+    '/settings/contacts/attributes': {
+      id: '/settings/contacts/attributes'
+      path: '/attributes'
+      fullPath: '/settings/contacts/attributes'
+      preLoaderRoute: typeof SettingsContactsAttributesRouteImport
+      parentRoute: typeof SettingsContactsRouteRoute
+    }
+    '/settings/contacts/views': {
+      id: '/settings/contacts/views'
+      path: '/views'
+      fullPath: '/settings/contacts/views'
+      preLoaderRoute: typeof SettingsContactsViewsRouteImport
+      parentRoute: typeof SettingsContactsRouteRoute
+    }
+    '/settings/organizations/': {
+      id: '/settings/organizations/'
+      path: '/'
+      fullPath: '/settings/organizations/'
+      preLoaderRoute: typeof SettingsOrganizationsIndexRouteImport
+      parentRoute: typeof SettingsOrganizationsRouteRoute
+    }
+    '/settings/organizations/attributes': {
+      id: '/settings/organizations/attributes'
+      path: '/attributes'
+      fullPath: '/settings/organizations/attributes'
+      preLoaderRoute: typeof SettingsOrganizationsAttributesRouteImport
+      parentRoute: typeof SettingsOrganizationsRouteRoute
+    }
+    '/settings/organizations/views': {
+      id: '/settings/organizations/views'
+      path: '/views'
+      fullPath: '/settings/organizations/views'
+      preLoaderRoute: typeof SettingsOrganizationsViewsRouteImport
+      parentRoute: typeof SettingsOrganizationsRouteRoute
+    }
   }
 }
 
+interface SettingsContactsRouteRouteChildren {
+  SettingsContactsAttributesRoute: typeof SettingsContactsAttributesRoute
+  SettingsContactsViewsRoute: typeof SettingsContactsViewsRoute
+  SettingsContactsIndexRoute: typeof SettingsContactsIndexRoute
+}
+
+const SettingsContactsRouteRouteChildren: SettingsContactsRouteRouteChildren = {
+  SettingsContactsAttributesRoute: SettingsContactsAttributesRoute,
+  SettingsContactsViewsRoute: SettingsContactsViewsRoute,
+  SettingsContactsIndexRoute: SettingsContactsIndexRoute,
+}
+
+const SettingsContactsRouteRouteWithChildren =
+  SettingsContactsRouteRoute._addFileChildren(
+    SettingsContactsRouteRouteChildren,
+  )
+
+interface SettingsOrganizationsRouteRouteChildren {
+  SettingsOrganizationsAttributesRoute: typeof SettingsOrganizationsAttributesRoute
+  SettingsOrganizationsViewsRoute: typeof SettingsOrganizationsViewsRoute
+  SettingsOrganizationsIndexRoute: typeof SettingsOrganizationsIndexRoute
+}
+
+const SettingsOrganizationsRouteRouteChildren: SettingsOrganizationsRouteRouteChildren =
+  {
+    SettingsOrganizationsAttributesRoute: SettingsOrganizationsAttributesRoute,
+    SettingsOrganizationsViewsRoute: SettingsOrganizationsViewsRoute,
+    SettingsOrganizationsIndexRoute: SettingsOrganizationsIndexRoute,
+  }
+
+const SettingsOrganizationsRouteRouteWithChildren =
+  SettingsOrganizationsRouteRoute._addFileChildren(
+    SettingsOrganizationsRouteRouteChildren,
+  )
+
 interface SettingsRouteRouteChildren {
+  SettingsContactsRouteRoute: typeof SettingsContactsRouteRouteWithChildren
+  SettingsOrganizationsRouteRoute: typeof SettingsOrganizationsRouteRouteWithChildren
   SettingsProfileRoute: typeof SettingsProfileRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
 const SettingsRouteRouteChildren: SettingsRouteRouteChildren = {
+  SettingsContactsRouteRoute: SettingsContactsRouteRouteWithChildren,
+  SettingsOrganizationsRouteRoute: SettingsOrganizationsRouteRouteWithChildren,
   SettingsProfileRoute: SettingsProfileRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
