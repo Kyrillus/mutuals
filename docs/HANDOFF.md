@@ -59,8 +59,23 @@ questions in `docs/DECISIONS.md` §14; they are repeated here because they are e
 - **Simon has approved how the app looks.** He ran it and said so. Do not redesign the shell.
 
 Still open, none of them blocking, all in `docs/DECISIONS.md` §14 with a recommendation:
-**Q4** (what is preselected for a near-certain duplicate in the import review grid) — **Stage 5
-needs this**, and it is the only open question left. **Q6 is answered**: ADR-093, and it is built.
+**Q4 is answered** (Simon, 2026-09-04): a near-certain duplicate is **not** silently pre-decided.
+The row is flagged and the user is asked in as many words — _"this looks like a contact you already
+have: do you really want to import it?"_ — with **not importing** as the default. That is option (a)
+of §14 plus an explicit prompt rather than a silent skip. **Q6 is answered** too: ADR-093, built.
+
+**Two small things found by Simon clicking around, neither blocking:**
+
+- **Fixed, but without a regression test.** A popover opened inside a dialog could not be scrolled
+  with the wheel: Radix's Dialog locks scrolling with `react-remove-scroll`, which allows wheel
+  events only inside its own subtree, and every popover portalled to `document.body`. Dialogs now
+  publish their content node (`useDialogContainer`) and the four portalling popovers render into it.
+  A spec was attempted and abandoned because the Type control has no stable accessible name — see
+  the next point. **Worth writing once that is fixed.**
+- **The Type and Group controls are buttons with no programmatic label.** `FieldRow` renders a
+  `<label for>`, which names form controls and not buttons, so their accessible name is their
+  current _value_ ("Short text") rather than "Type". Harmless on screen, wrong for a screen reader,
+  and it is what made the regression test above brittle.
 
 ## The environment, exactly
 

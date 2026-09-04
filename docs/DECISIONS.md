@@ -2474,11 +2474,7 @@ actionable of the two); (b) include them, at the cost of a freshly imported 10k-
 filling the view on day one. The compiler must pick one; it cannot be a per-chip toggle, because the
 filter model is AND-only by design.
 
-**Q4 — Import review grid: what is pre-selected for a near-certain duplicate (Simon).** Options:
-**(a)** `Skip` (recommended — re-importing the same export becomes a no-op, which is what §6.8 asks
-for, and nothing is ever silently overwritten); (b) `Merge into existing`, filling empty fields only
-(better for enrichment: a newer LinkedIn export fills in job changes — but it writes to existing
-records from a bulk action the user may click through); (c) pre-select nothing and force a choice.
+**Q4 — Import review grid: what is pre-selected for a near-certain duplicate (Simon). Answered 2026-09-04.** None of the three options as written. Simon asked for the row to be flagged and the user _told_: "this looks like a contact you already have — do you really want to import it?", with **not importing** as the default. So it is option (a)'s behaviour — re-importing the same export stays a no-op and nothing is silently overwritten — but stated as a question rather than as a silent skip, so the person sees why the row did not land. Stage 5 builds it that way.
 
 **Q5 — Dark mode in Phase 1 (Simon).** §5.1 does not mention it. The tokens cost nothing and are
 already specified; a tested toggle plus dark screenshots in every stage report is about half a day.

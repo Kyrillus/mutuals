@@ -39,6 +39,21 @@ function DialogOverlay({
   )
 }
 
+/**
+ * The dialog's own content node, published so a popover opened *inside* a dialog can portal into it
+ * rather than into `document.body`.
+ *
+ * This is not cosmetic. Radix's Dialog locks scrolling with `react-remove-scroll`, which allows
+ * wheel events only inside its own subtree. A popover portalled to the body is outside that subtree,
+ * so its list scrolls in the DOM and refuses to scroll under the mouse — which is exactly what the
+ * twelve-item type picker did: visible, scrollable, and immovable. Reported by Simon, 2026-09-04.
+ */
+const DialogContainerContext = React.createContext<HTMLElement | null>(null)
+
+export function useDialogContainer(): HTMLElement | null {
+  return React.useContext(DialogContainerContext)
+}
+
 function DialogContent({
   className,
   children,
@@ -47,10 +62,13 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const [container, setContainer] = React.useState<HTMLElement | null>(null)
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
+        ref={setContainer}
         data-slot="dialog-content"
         className={cn(
           'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
@@ -58,7 +76,9 @@ function DialogContent({
         )}
         {...props}
       >
-        {children}
+        <DialogContainerContext.Provider value={container}>
+          {children}
+        </DialogContainerContext.Provider>
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"

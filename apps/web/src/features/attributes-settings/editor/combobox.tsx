@@ -13,6 +13,7 @@ import { ChevronsUpDown } from 'lucide-react'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 import type { ReactNode } from 'react'
 
+import { useDialogContainer } from '@/ui/dialog.tsx'
 import { cn } from '@/lib/utils.ts'
 
 export const Combobox = PopoverPrimitive.Root
@@ -75,6 +76,9 @@ export function ComboboxContent({
   /** The "use what I typed" row a free-text combobox needs; outside the list so it never scrolls. */
   footer?: ReactNode
 }) {
+  // Portalled into the dialog when there is one, so the dialog's scroll lock does not swallow
+  // the wheel over this list (see `useDialogContainer`).
+  const container = useDialogContainer()
   // The content deliberately does NOT prevent Radix's open-auto-focus, which is what the table's
   // picker does. This popover opens inside a Radix Dialog, and a Dialog traps focus: leaving the
   // popover's own focus scope inert lets the trap pull focus back into the dialog, and keystrokes
@@ -82,7 +86,7 @@ export function ComboboxContent({
   // with "Number" typed into the Slug field. Radix focuses the first tabbable element in the
   // content, which is the search box, so the first keystroke is not lost either.
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container ?? undefined}>
       <PopoverPrimitive.Content
         align="start"
         sideOffset={4}

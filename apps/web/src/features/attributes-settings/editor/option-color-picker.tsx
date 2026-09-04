@@ -10,6 +10,7 @@ import { Check } from 'lucide-react'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 import { useState } from 'react'
 
+import { useDialogContainer } from '@/ui/dialog.tsx'
 import { Chip } from '@/ui/chip.tsx'
 import { CHIP_COLORS, type ChipColor } from '@/ui/chip-colors.ts'
 
@@ -22,6 +23,9 @@ export function OptionColorPicker({
   label: string
   onChange: (next: ChipColor) => void
 }) {
+  // Portalled into the dialog when there is one, so the dialog's scroll lock does not swallow
+  // the wheel over this list (see `useDialogContainer`).
+  const container = useDialogContainer()
   const [open, setOpen] = useState(false)
   const preview = label.trim() === '' ? 'Aa' : label
 
@@ -36,7 +40,7 @@ export function OptionColorPicker({
         </Chip>
       </PopoverPrimitive.Trigger>
 
-      <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Portal container={container ?? undefined}>
         <PopoverPrimitive.Content
           align="start"
           sideOffset={6}

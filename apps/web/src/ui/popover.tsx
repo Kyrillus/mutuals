@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useDialogContainer } from '@/ui/dialog.tsx'
 import { cn } from '@/lib/utils.ts'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 
@@ -22,8 +23,11 @@ function PopoverContent({
   sideOffset = 6,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  // Portalled into the dialog when there is one, so the dialog's scroll lock does not swallow
+  // the wheel over this list (see `useDialogContainer`).
+  const container = useDialogContainer()
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container ?? undefined}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}

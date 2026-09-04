@@ -12,6 +12,7 @@ import { Check, ChevronsUpDown } from 'lucide-react'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 import type { ReactNode } from 'react'
 
+import { useDialogContainer } from '@/ui/dialog.tsx'
 import { cn } from '@/lib/utils.ts'
 
 import { CONTROL_HEIGHT, CONTROL_SURFACE } from '../input-props.ts'
@@ -81,8 +82,11 @@ export function PickerContent({
   shouldFilter?: boolean
   className?: string
 }) {
+  // Portalled into the dialog when there is one, so the dialog's scroll lock does not swallow
+  // the wheel over this list (see `useDialogContainer`).
+  const container = useDialogContainer()
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container ?? undefined}>
       <PopoverPrimitive.Content
         align="start"
         sideOffset={4}
@@ -124,8 +128,11 @@ export function PickerContent({
  * be a second place to type and cmdk's keyboard navigation would never see a key.
  */
 export function PickerPanel({ children, className }: { children: ReactNode; className?: string }) {
+  // Portalled into the dialog when there is one, so the dialog's scroll lock does not swallow
+  // the wheel over this list (see `useDialogContainer`).
+  const container = useDialogContainer()
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container ?? undefined}>
       <PopoverPrimitive.Content
         align="start"
         sideOffset={4}
