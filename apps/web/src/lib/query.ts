@@ -58,4 +58,7 @@ export const qk = {
   interactions: (recordId: string) => ['interactions', recordId] as const,
   interactionList: (recordId: string, query: Readonly<Record<string, unknown>>) =>
     ['interactions', recordId, query] as const,
+  /** Every follow-up list, whatever tab or contact it is filtered to. */
+  followUps: () => ['follow-ups'] as const,
+  followUpList: (query: Readonly<Record<string, unknown>>) => ['follow-ups', query] as const,
 }

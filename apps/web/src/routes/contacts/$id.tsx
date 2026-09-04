@@ -19,6 +19,9 @@ import { ConfirmDialog } from '@/ui/confirm-dialog.tsx'
 import { AttributeSidebar } from '@/features/records/detail/attribute-sidebar.tsx'
 import { ConnectionsTab } from '@/features/records/detail/connections-tab.tsx'
 import { RecordHeader } from '@/features/records/detail/record-header.tsx'
+import { FollowUpDialog } from '@/features/follow-ups/follow-up-dialog.tsx'
+import { FollowUpList } from '@/features/follow-ups/follow-up-list.tsx'
+import { useFollowUps } from '@/features/follow-ups/use-follow-ups.ts'
 import { InteractionTimeline } from '@/features/interactions/interaction-timeline.tsx'
 import { useAttributeDefinitions } from '@/features/records/use-attribute-definitions.ts'
 import { useContact } from '@/features/records/use-record.ts'
@@ -28,6 +31,7 @@ import { qk } from '@/lib/query.ts'
 import { api } from '@/lib/api.ts'
 
 import { recordFieldResolver } from '@/table/fields.ts'
+import { Button } from '@/ui/button.tsx'
 import { Skeleton } from '@/ui/skeleton.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs.tsx'
 
@@ -111,10 +115,7 @@ function ContactDetailPage() {
             </TabsContent>
 
             <TabsContent value="follow-ups">
-              <p className="text-muted-foreground text-sm">
-                Follow-ups arrive in Stage 4 (§6.4). This contact has {String(row.openFollowups)}{' '}
-                open.
-              </p>
+              <ContactFollowUps contact={{ id: row.id, displayName: row.displayName }} />
             </TabsContent>
           </Tabs>
         </div>
@@ -231,5 +232,46 @@ function DetailSkeleton() {
         ))}
       </div>
     </div>
+  )
+}
+
+/** §6.5's Follow-ups tab: this contact's, open and done, with the contact chip suppressed. */
+function ContactFollowUps({ contact }: { contact: { id: string; displayName: string } }) {
+  const [creating, setCreating] = useState(false)
+  const followUps = useFollowUps({ contactId: contact.id, limit: 200 })
+
+  return (
+    <>
+      <div className="mb-3 flex justify-end">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setCreating(true)
+          }}
+        >
+          Add follow-up
+        </Button>
+      </div>
+      <FollowUpList
+        rows={followUps.data}
+        pending={followUps.isPending}
+        error={followUps.error}
+        showContact={false}
+        emptyTitle="Nothing to follow up on"
+        emptyDescription="A follow-up is a reminder attached to this person. Marking a repeating one done schedules the next automatically."
+        emptyAction={
+          <Button
+            size="sm"
+            onClick={() => {
+              setCreating(true)
+            }}
+          >
+            Add follow-up
+          </Button>
+        }
+      />
+      <FollowUpDialog open={creating} onOpenChange={setCreating} fixedContact={contact} />
+    </>
   )
 }
