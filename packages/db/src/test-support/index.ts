@@ -11,6 +11,7 @@ export {
   TEST_WORKSPACE_ID,
   UnexpectedBaselineRowsError,
   UnsafeTestDatabaseError,
+  assertSafeE2eDatabase,
   assertSafeTestDatabase,
   closeTestDatabase,
   databaseNameOf,
@@ -23,5 +24,13 @@ export {
   testWorkerId,
   workerDatabaseName,
 } from './database.ts'
+
+export {
+  captureE2eBaseline,
+  closeE2eDatabase,
+  e2eDb,
+  requireE2eDatabaseUrl,
+  resetE2eDatabase,
+} from './e2e.ts'
 
 export { attributeIdBySlug, optionIdByKey } from './fixtures.ts'

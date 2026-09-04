@@ -52,18 +52,18 @@ const CLONE_LOCK_KEY = 7_239_518_273
 export class MissingTestDatabaseUrlError extends Error {
   override readonly name = 'MissingTestDatabaseUrlError'
 
-  constructor() {
-    super('TEST_DATABASE_URL is not set. Copy .env.example to .env, then run: pnpm db:up')
+  constructor(variable = 'TEST_DATABASE_URL') {
+    super(`${variable} is not set. Copy .env.example to .env, then run: pnpm db:up`)
   }
 }
 
 export class UnsafeTestDatabaseError extends Error {
   override readonly name = 'UnsafeTestDatabaseError'
 
-  constructor(reason: string) {
+  constructor(reason: string, variable = 'TEST_DATABASE_URL', suffix = '_test') {
     super(
       `Refusing to run destructive test setup: ${reason}\n` +
-        'TEST_DATABASE_URL must name a database ending in "_test" on a local host.',
+        `${variable} must name a database ending in "${suffix}" on a local host.`,
     )
   }
 }
@@ -99,7 +99,7 @@ export class UnexpectedBaselineRowsError extends Error {
 const REPO_ENV = fileURLToPath(new URL('../../../../.env', import.meta.url))
 let envLoaded = false
 
-function loadRepoEnv(): void {
+export function loadRepoEnv(): void {
   if (envLoaded) return
   envLoaded = true
   if (existsSync(REPO_ENV)) process.loadEnvFile(REPO_ENV)
@@ -122,33 +122,56 @@ export function databaseNameOf(url: string): string {
 }
 
 /**
- * The guard, in the two directions that matter: the database has to be a test database, and the
- * host has to be this machine unless somebody has explicitly said otherwise.
+ * The guard, in the two directions that matter: the database has to be the one this caller is
+ * allowed to destroy, and the host has to be this machine unless somebody has explicitly said so.
+ *
+ * The suffix is a parameter rather than a widened check because the two callers must keep refusing
+ * each other's database. Vitest drops `mutuals_test_w*` clones wholesale; the Playwright suite owns
+ * `mutuals_e2e` and nothing else. One predicate accepting both would let a mistyped variable in
+ * either direction through, and the whole point of this function is that it is the last line.
  */
-export function assertSafeTestDatabase(url: string): void {
+function assertSafeDatabase(url: string, variable: string, suffix: string): void {
   let parsed: URL
   try {
     parsed = new URL(url)
   } catch {
-    throw new UnsafeTestDatabaseError(`TEST_DATABASE_URL is not a URL (${url})`)
+    throw new UnsafeTestDatabaseError(`${variable} is not a URL (${url})`, variable, suffix)
   }
 
   const name = parsed.pathname.replace(/^\//, '')
-  if (!name.endsWith('_test')) {
+  if (!name.endsWith(suffix)) {
     throw new UnsafeTestDatabaseError(
-      `the database is named "${name}", which does not end in _test`,
+      `the database is named "${name}", which does not end in ${suffix}`,
+      variable,
+      suffix,
     )
   }
   if (!SAFE_IDENTIFIER.test(name)) {
-    throw new UnsafeTestDatabaseError(`the database name "${name}" is not a plain identifier`)
+    throw new UnsafeTestDatabaseError(
+      `the database name "${name}" is not a plain identifier`,
+      variable,
+      suffix,
+    )
   }
 
   const host = parsed.hostname
   if (!LOCAL_HOSTS.has(host) && process.env.MUTUALS_ALLOW_DESTRUCTIVE !== '1') {
     throw new UnsafeTestDatabaseError(
       `the host is "${host}", not this machine. Set MUTUALS_ALLOW_DESTRUCTIVE=1 if you mean it`,
+      variable,
+      suffix,
     )
   }
+}
+
+/** The Vitest integration project's database: `*_test`, and the clones it templates. */
+export function assertSafeTestDatabase(url: string): void {
+  assertSafeDatabase(url, 'TEST_DATABASE_URL', '_test')
+}
+
+/** The Playwright suite's database: `*_e2e`, which {@link assertSafeTestDatabase} refuses. */
+export function assertSafeE2eDatabase(url: string): void {
+  assertSafeDatabase(url, 'E2E_DATABASE_URL', '_e2e')
 }
 
 function urlForDatabase(url: string, name: string): string {
@@ -231,7 +254,7 @@ export async function ensureWorkerDatabase(url: string, poolId: number): Promise
   return name
 }
 
-interface BaselineTable {
+export interface BaselineTable {
   readonly table: string
   readonly rows: unknown
 }
@@ -324,7 +347,7 @@ export async function writeBaseline(url: string, snapshot: Snapshot): Promise<vo
   await writeFile(snapshotPath(url), JSON.stringify(snapshot), 'utf8')
 }
 
-async function readBaseline(url: string): Promise<Snapshot> {
+export async function readBaseline(url: string): Promise<Snapshot> {
   try {
     return JSON.parse(await readFile(snapshotPath(url), 'utf8')) as Snapshot
   } catch {
@@ -353,9 +376,39 @@ async function open(): Promise<WorkerDatabase> {
     name,
     pool,
     db: dbFromPool(pool),
-    truncate: `truncate table ${snapshot.tables.join(', ')} restart identity cascade`,
+    truncate: truncateStatement(snapshot),
     baseline: snapshot.baseline,
   }
+}
+
+/** One statement naming every table, so a reset is a single round trip. */
+export function truncateStatement(snapshot: Snapshot): string {
+  return `truncate table ${snapshot.tables.join(', ')} restart identity cascade`
+}
+
+/**
+ * Empty every table, then put the migrations' own rows back exactly as they were.
+ *
+ * **The one implementation of a reset.** The Vitest projects reach it through
+ * {@link resetDatabase}; the Playwright suite reaches it through `resetE2eDatabase` in `./e2e.ts`.
+ * ADR-079 requires those two to be the same thing, and this function is what makes that true rather
+ * than merely claimed.
+ */
+export async function applyReset(
+  db: Kysely<DB>,
+  truncate: string,
+  baseline: readonly BaselineTable[],
+): Promise<void> {
+  await db.transaction().execute(async (trx) => {
+    await sql.raw(truncate).execute(trx)
+    for (const { table, rows } of baseline) {
+      if (Array.isArray(rows) && rows.length === 0) continue
+      await sql`
+        insert into ${sql.table(table)}
+        select * from jsonb_populate_recordset(null::${sql.table(table)}, ${JSON.stringify(rows)}::jsonb)
+      `.execute(trx)
+    }
+  })
 }
 
 /**
@@ -393,16 +446,7 @@ export async function resetDatabase(): Promise<void> {
   const state = worker
   if (state === undefined) throw new Error('the test database is not open')
 
-  await db.transaction().execute(async (trx) => {
-    await sql.raw(state.truncate).execute(trx)
-    for (const { table, rows } of state.baseline) {
-      if (Array.isArray(rows) && rows.length === 0) continue
-      await sql`
-        insert into ${sql.table(table)}
-        select * from jsonb_populate_recordset(null::${sql.table(table)}, ${JSON.stringify(rows)}::jsonb)
-      `.execute(trx)
-    }
-  })
+  await applyReset(db, state.truncate, state.baseline)
 }
 
 /** Closes the worker's pool. `globalSetup` cannot do it: the pool lives in another process. */

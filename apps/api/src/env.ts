@@ -33,6 +33,8 @@ export const EnvSchema = z.object({
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
   /** Required by the integration suite, absent in production. */
   TEST_DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).optional(),
+  /** The same for the Playwright suite. The API never reads it; it is here so the pair stays in sync. */
+  E2E_DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).optional(),
 
   // -- API -----------------------------------------------------------------------------------
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),

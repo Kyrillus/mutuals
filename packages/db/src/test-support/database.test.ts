@@ -8,6 +8,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  assertSafeE2eDatabase,
   assertSafeTestDatabase,
   databaseNameOf,
   TestWorkerOutOfRangeError,
@@ -51,6 +52,47 @@ describe('assertSafeTestDatabase', () => {
 
     process.env.MUTUALS_ALLOW_DESTRUCTIVE = '1'
     expect(() => assertSafeTestDatabase(remote)).not.toThrow()
+  })
+})
+
+/**
+ * The Playwright suite owns `mutuals_e2e` and truncates it between tests, so it needs a guard of
+ * its own — and the two guards must keep refusing each other's database. A single predicate
+ * accepting both suffixes would turn a mistyped variable into a silent cross-suite truncate, which
+ * is the failure the `_test` guard exists to prevent in the first place (ADR-087).
+ */
+describe('assertSafeE2eDatabase', () => {
+  it('accepts a local database whose name ends in _e2e', () => {
+    expect(() =>
+      assertSafeE2eDatabase('postgres://mutuals:mutuals@localhost:5432/mutuals_e2e'),
+    ).not.toThrow()
+    expect(() =>
+      assertSafeE2eDatabase('postgres://mutuals@127.0.0.1:5432/anything_e2e'),
+    ).not.toThrow()
+  })
+
+  it.each([
+    ['the development database', 'postgres://mutuals@localhost:5432/mutuals_dev'],
+    ['the integration database', 'postgres://mutuals@localhost:5432/mutuals_test'],
+    ['a Vitest worker clone', 'postgres://mutuals@localhost:5432/mutuals_test_w1'],
+    ['a name that merely contains _e2e', 'postgres://mutuals@localhost:5432/mutuals_e2e_backup'],
+    ['no database at all', 'postgres://mutuals@localhost:5432/'],
+  ])('refuses %s', (_case, url) => {
+    expect(() => assertSafeE2eDatabase(url)).toThrow(UnsafeTestDatabaseError)
+  })
+
+  it('names the variable it wants in the message it throws', () => {
+    expect(() => assertSafeE2eDatabase('postgres://mutuals@localhost:5432/mutuals_dev')).toThrow(
+      /E2E_DATABASE_URL must name a database ending in "_e2e"/,
+    )
+  })
+
+  it('refuses a host that is not this machine, unless it is told to', () => {
+    const remote = 'postgres://mutuals@db.example.com:5432/mutuals_e2e'
+    expect(() => assertSafeE2eDatabase(remote)).toThrow(UnsafeTestDatabaseError)
+
+    process.env.MUTUALS_ALLOW_DESTRUCTIVE = '1'
+    expect(() => assertSafeE2eDatabase(remote)).not.toThrow()
   })
 })
 
