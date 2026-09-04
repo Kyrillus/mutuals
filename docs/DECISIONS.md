@@ -2718,9 +2718,19 @@ states, and which review should enforce: **anything the domain decides — warmt
 is overdue, when the next occurrence falls — is computed server-side against the injected clock and
 travels as data. The browser may read the clock to say "3 weeks ago" and for nothing else.**
 
-Falsifier: a `grep` for `new Date()` in `apps/web/src` should return `ambientDisplay`, the CSV
-filename, and the two `datetime-local` conversions in the interaction dialog. Anything else is a
-domain decision that has leaked into the client.
+Falsifier, and it was run rather than asserted — the first draft of this paragraph said "four
+places" and there are seven. `grep -rn "new Date()\|Date\.now()" apps/web/src` should return exactly:
+
+| Where                                                    | Why it is allowed                                                                                                                                                                     |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `attributes/display-context.tsx`                         | `ambientDisplay()` itself — the one read this ADR is about                                                                                                                            |
+| `features/interactions/interaction-dialog.tsx` ×2        | Defaulting a `datetime-local` to now, and converting one back                                                                                                                         |
+| `features/records/record-table.tsx`                      | A CSV filename                                                                                                                                                                        |
+| `features/attributes-settings/list/attributes-table.tsx` | The same CSV filename helper                                                                                                                                                          |
+| `features/attributes-settings/editor/draft.ts`           | A uniqueness suffix, not a time                                                                                                                                                       |
+| `routes/index.tsx`                                       | "Good morning" — deliberately the reader's own clock, not the profile's timezone, because whether it is morning depends on where the reader is sitting and not on a workspace setting |
+
+An eighth is a domain decision that has leaked into the client.
 
 ### ADR-092 — Derived columns are recomputed on write, scoped to the records that moved
 
