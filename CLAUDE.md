@@ -63,13 +63,18 @@ pnpm verify       # what CI runs: verify:static + verify:db
 pnpm verify:full  # ...plus Playwright
 ```
 
-`pnpm` is reached through `corepack pnpm` if it is not on your PATH. Docker lives at
-`~/.docker/bin` on the author's machine and is not on the default PATH either.
+`pnpm` is reached through `corepack pnpm` if it is not on your PATH — and the composite `verify`
+scripts call `pnpm` themselves, so run `corepack enable pnpm` once or they fail with "command not
+found". Docker lives at `~/.docker/bin` on the author's machine and is not on the default PATH
+either. `docs/HANDOFF.md` has the rest of the environment notes.
 
 ## Stages
 
-1. **Foundation** — migrations, domain core, query compiler, API skeleton, seed. ← _current_
-2. Contacts table + Settings → Attributes
+1. ~~**Foundation**~~ — migrations, domain core, query compiler, API skeleton, seed. **Done**, PR #1.
+2. **Contacts table + Settings → Attributes** ← _current_. Sections 1–3 done (app shell in light and
+   dark; the DataTable, filter bar and contacts page; Settings and the attribute editor). **Section 4
+   remains**: Playwright e2e for the four flows §8.1 names, an empty-state and keyboard pass, then
+   the PR. See `docs/HANDOFF.md`.
 3. Organizations + relations + the contact detail page
 4. Follow-ups + dashboard + saved views
 5. Import wizard + duplicates + merge
