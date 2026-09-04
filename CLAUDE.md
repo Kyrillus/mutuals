@@ -83,8 +83,10 @@ either. `docs/HANDOFF.md` has the rest of the environment notes.
 3. ~~**Organizations + relations + the contact detail page**~~ — the organizations table and detail
    page, contact↔organization links with their metadata, the contact detail page and §4.5's value
    history popover. **Done**, in PR #1 (ADR-089).
-4. **Follow-ups + dashboard + saved views** ← _current_
-5. Import wizard + duplicates + merge
+4. ~~**Follow-ups + dashboard + saved views**~~ — the follow-ups page with its quick-filter tabs and
+   recurrence, §6.1's dashboard, and §6.6's saved views over ADR-048's URL-is-the-working-copy model.
+   **Done**, in PR #1 (ADR-089).
+5. **Import wizard + duplicates + merge** ← _current_
 6. LLM layer (ask, quick capture, summaries) + command palette
 7. Polish and `v0.1.0`
 

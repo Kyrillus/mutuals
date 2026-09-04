@@ -19,16 +19,17 @@ Most CRMs are built for sales teams. This one is built for a person and their ne
 
 ## Status
 
-**Pre-alpha. Stages 1–3 of 7 are done.** Invent a field in Settings and it is a real column straight
+**Pre-alpha. Stages 1–4 of 7 are done.** Invent a field in Settings and it is a real column straight
 away — filterable, sortable, on every contact, with no deploy and no migration. Open a person and you
 get their work history as a CV, every field inline-editable, and a history behind each value that says
-what it used to be, since when, and where it came from.
+what it used to be, since when, and where it came from. Follow-ups repeat and reschedule themselves,
+the dashboard shows what needs you, and any table you have filtered can be saved as a named view.
 
 - [`docs/BRIEF.md`](./docs/BRIEF.md) — the product specification: data model, every screen, the build
   plan. The source of truth for product decisions. Reference screenshots in [`docs/refs/`](./docs/refs).
 - [`docs/PLAN.md`](./docs/PLAN.md) — the implementation plan, in two layers: a plain summary and the
   technical detail.
-- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 92 records.
+- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 94 records.
   `docs/adr-archive/` keeps the reasoning trail, including the designs that were rejected.
 
 ### Running it

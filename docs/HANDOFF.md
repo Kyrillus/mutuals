@@ -12,8 +12,7 @@ talked to.
 
 ## Where the work stopped
 
-**Stages 1, 2 and 3 are done. Stage 4 is half done** — follow-ups and the dashboard have landed;
-saved views are what remains. Everything lives in
+**Stages 1 to 4 are done.** Everything lives in
 [PR #1](https://github.com/Kyrillus/mutuals/pull/1), which grew to cover them together and was
 retitled — see ADR-089 for why, and why that was Simon's call rather than a default.
 
@@ -28,12 +27,13 @@ retitled — see ADR-089 for why, and why that was Simon's call rather than a de
 UI, §6.5's contact detail page with its four tabs, interactions CRUD, and §4.5's value-history
 popover — the first screen that reads the append-only log.
 
-**Stage 4, session A** added §6.4's follow-ups — the page with its quick-filter tabs, create/edit,
-mark done, snooze, and the Follow-ups tab on a contact — plus §6.1's dashboard: the four stat cards,
-"Needs your attention" and the recently-interacted list. Q6 is answered and shipped (ADR-093).
+**Stage 4** added §6.4's follow-ups — the page with its quick-filter tabs, create/edit, mark done,
+snooze, and the Follow-ups tab on a contact — §6.1's dashboard, and §6.6's saved views. Q6 is
+answered and shipped (ADR-093); ADR-094 records what building views settled.
 
 `pnpm verify` is green: 1,160 unit tests, 311 integration tests, lint, typecheck and build clean.
-`pnpm verify:e2e` is green: 14 specs, 1 `fixme` (the LinkedIn import, Stage 5).
+`pnpm verify:e2e` is green: 17 specs, 1 `fixme` — and that one is the LinkedIn import, which is
+exactly what Stage 5 turns into a real test.
 
 **Do not merge PR #1.** `main` has moved on — another session built a getmutuals.ai waitlist site in
 `site/`, which this branch never touches. Merging PR #1 today would delete the old German Next.js
@@ -59,8 +59,8 @@ questions in `docs/DECISIONS.md` §14; they are repeated here because they are e
 - **Simon has approved how the app looks.** He ran it and said so. Do not redesign the shell.
 
 Still open, none of them blocking, all in `docs/DECISIONS.md` §14 with a recommendation:
-**Q4** (what is preselected for a near-certain duplicate in the import review grid — Stage 5).
-**Q6 is answered**: ADR-093, and it is built.
+**Q4** (what is preselected for a near-certain duplicate in the import review grid) — **Stage 5
+needs this**, and it is the only open question left. **Q6 is answered**: ADR-093, and it is built.
 
 ## The environment, exactly
 
@@ -101,6 +101,10 @@ Four traps that already cost time once each, all now guarded but worth knowing:
   derives — a follow-up's `state`, the date of a recurrence's next occurrence — is still computed
   against the real today. Asserting a literal server-derived date in an e2e spec asserts what day
   the machine thinks it is. ADR-091 has the corrected version; a test found this the hard way.
+- **A view's snapshot is the _effective_ columns, not the URL's.** The URL omits `columns` while the
+  table shows its defaults, so reading it straight saves a view with no columns that is dirty the
+  instant it is created. ADR-094 has the detail; it is the kind of thing that looks fine until a
+  test asserts it.
 - **Radix tabs and popovers do not respond to synthetic `.click()`.** Driving the app through
   `javascript_tool` will silently fail on them; Playwright sends real pointer events and does not.
   Verify anything tab- or popover-shaped through the e2e suite rather than through the dev console.
@@ -109,33 +113,29 @@ Four traps that already cost time once each, all now guarded but worth knowing:
 
 Paste this as the first message of the new session:
 
-> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §5.2 and §6.6.
+> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §6.8, §6.9 and §4.6.
 >
-> Build **Stage 4, session B — saved views**, which closes the stage.
+> Build **Stage 5 — the import wizard, duplicate detection and merge**. It is the largest stage left
+> and splits cleanly in two; do the first half, stop, and report.
 >
-> A view is a named set of visible columns, their order, filters and sort (§5.2, §6.6). Most of the
-> machinery exists and the job is mostly reconciliation, not construction:
+> **Session A — the wizard and what lands.** §6.8's five steps: upload, map columns, fix errors in
+> an editable grid, review, commit. `import_batch` and `import_row` exist from migration 0005 and
+> nothing has touched them. Eight operation names are already reserved in `PLANNED_OPERATIONS`
+> (`createImportBatch` … `getImportErrorReport`) — move them across rather than inventing names.
+> `fixtures/linkedin_connections_sample.csv` and `google_contacts_sample.csv` are the fixtures, and
+> the LinkedIn one has three preamble lines before its header on purpose.
 >
-> 1. **The working copy is already in the URL** (ADR-047), and `retainSearchParams(['view'])` already
->    carries `?view=` through every navigation (ADR-048). `serializeListQuery` is already canonical
->    and ADR-048 already says dirtiness is deep equality over exactly its output — so there is one
->    canonicalisation to compare against, not two.
-> 2. **The operations are already named**: `listViews`, `createView`, `updateView`, `deleteView` sit
->    in `PLANNED_OPERATIONS` in `apps/api/src/routes/operations.ts`. Move them to `OPERATIONS` rather
->    than inventing names — `operations.test.ts` asserts the two arrays stay disjoint.
-> 3. **What is missing** is persistence, the `⋮` menu of §5.2 (`Save changes to view`, `Save as new
-view`, `Revert changes`, `Table settings`), and the breadcrumb reading `Contacts › Investors in
-Munich`. §6.2 also names four seeded views, and the seed already creates five contact views and
->    one organization view — check what is there before adding more.
-> 4. **The hard part is the state machine**, and it is worth designing before typing: the URL holds a
->    working copy, the saved view holds a baseline, and the UI has to say which is showing, whether
->    they differ, and what each menu item does in each case. Get that on paper first.
-> 5. **`routes/settings/-components/table-views.tsx`** is currently an empty state explaining that
->    views are Stage 4. It is where the management screen goes.
+> **Session B — duplicates and merge.** §4.6's identity matching already exists and is unit-tested
+> in `packages/core`: exact on a normalised identifier is near-certain, name similarity is only ever
+> the fallback. §6.9's merge UI is the new part. **Q4 needs Simon** before session B: what is
+> preselected for a near-certain duplicate in the review grid (`docs/DECISIONS.md` §14, with a
+> recommendation). Ask it at the start of that session, not the end.
 >
-> Closing the stage: update `docs/PLAN.md`, `CLAUDE.md`'s stage marker and `README.md`, then retitle
-> PR #1 and rewrite its body to cover Stages 1–4. Everything is on `version/claude-v1` and therefore
-> in PR #1 (ADR-089). **Still do not merge it.**
+> **`e2e/specs/import-linkedin-csv.spec.ts` is the acceptance test** and it is already written, as
+> `fixme`, with the numbers it expects and why: the fixture holds two deliberate collisions, one
+> exact-identifier and one diacritic-fold. Changing an assertion is allowed; say why in the PR body.
+>
+> Everything goes on `version/claude-v1` and therefore into PR #1 (ADR-089). **Still do not merge it.**
 >
 > Verify by running things, not by reading them. `pnpm verify:full` is the gate. Report back in the
 > two layers §0 requires.

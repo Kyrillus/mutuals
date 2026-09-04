@@ -2803,3 +2803,47 @@ freeze them at yesterday's number. A failed sweep is logged at `warn` and swallo
 hours stale is a better day than an API that would not start. Option (b) was rejected on Simon's own
 grounds: the app is opened many times a day and nine of those ten openings would do nothing but
 work. Stage 4's scheduled sweep, when it exists, calls the same function unscoped.
+
+### ADR-094 — Saved views, built: what ADR-048 left open, and one wrinkle it did not foresee
+
+**Context.** ADR-048 settled the semantics in Stage 2 — the URL is the working copy, a view is a
+named snapshot, dirty is deep equality over the canonical `(filters, sort, columns)` triple — and
+Stage 4 had to build it. Most of the machinery was already there: `ViewSnapshot`,
+`canonicalViewSnapshot` and `viewSnapshotsEqual` in `packages/core`, `retainSearchParams(['view'])`
+on both list routes, the `saved_view` table with `sv_default_uq`, and the four operation names
+reserved in `PLANNED_OPERATIONS`. The decisions left were smaller and are recorded here.
+
+**What the snapshot is taken from.** Not `query.columns`. The URL omits `columns` entirely while the
+table shows its defaults, so a snapshot read straight from the URL saves `null` — a view with no
+columns — and then compares unequal to itself the moment the parameter becomes explicit.
+`useViewState` takes the _effective_ columns, which is what the table is actually rendering. The
+first version did not, and the e2e spec caught it as "a view is dirty the instant you save it".
+
+**Where the view's name comes from in the breadcrumb.** A route loader returning `{ crumb }`, the
+mechanism Stage 3 added for record detail pages, rather than a second one. Two consequences worth
+knowing: it is `fetchQuery` and not `ensureQueryData`, because a view saved a moment ago has just
+invalidated that key and the crumb must name it rather than the list from before it existed; and
+every view mutation calls `router.invalidate()`, because the router caches loader data per
+navigation and a rename would otherwise leave the old name in the crumb until the next click.
+
+**Where the `⋮` items are built.** In `features/views`, passed into `table/data-table.tsx` through a
+slot. The alternative was the generic table importing a saved-view hook, which is how a shared
+component stops being shared. It keeps the three disabled placeholders when no slot is passed, so
+the menu does not change shape between a page with views and one without.
+
+**The wrinkle ADR-048 did not foresee.** Hiding a column and then showing it again does **not**
+restore its position — the Columns menu appends a re-shown column to the end. That is defensible on
+its own, but it interacts badly with views: a hide/show cycle leaves the view permanently dirty even
+though the user has visibly undone their change. Left as it is for now, because changing where a
+column reappears is a table-behaviour decision that belongs with §5.2's drag-reordering rather than
+with views, and Simon has approved how the table behaves. Recorded so the next person meets it as a
+known thing rather than a bug. The e2e spec therefore demonstrates canonical-vs-string dirtiness
+with a filter, which is genuinely reversible, and additionally asserts that **searching does not
+dirty a view** — `q` is not one of the three things a view stores.
+
+**Consequences.** The management screen at Settings → Table views can rename, set the default and
+delete, but deliberately cannot edit a view's filters or columns: the table is the only place a
+snapshot is composed, and a second editor would be a second definition of what a view is. The
+migration's comment describing `saved_view.columns` as `[{slug, width?}]` has never matched the
+implementation, which stores plain slugs; an applied migration is not edited, so it is corrected
+here instead.
