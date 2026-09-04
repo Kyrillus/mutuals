@@ -25,6 +25,17 @@ export interface MetricsOptions {
   readonly today: CivilDate
   /** `profile.time_zone`; the civil day an interaction falls on is only defined in a zone. */
   readonly timeZone?: string
+  /**
+   * Recompute only these contacts, and only these organizations (ADR-092).
+   *
+   * Absent means the whole workspace, which is what the seed and the eventual nightly sweep want.
+   * Logging one interaction wants the opposite: recomputing 10,000 contacts to move one person's
+   * warmth is the shape of mistake that made deleting a contact take four seconds in Stage 1.
+   */
+  readonly scope?: {
+    readonly contactIds?: readonly string[]
+    readonly organizationIds?: readonly string[]
+  }
 }
 
 export interface MetricsResult {
@@ -61,10 +72,18 @@ export async function recomputeMetrics(
   const timeZone = options.timeZone ?? (await profileTimeZone(exec)) ?? 'Europe/Berlin'
   const windowStart = addDays(options.today, -WARMTH_WINDOW_DAYS)
 
-  const contacts = await exec
-    .selectFrom('contact')
-    .select(['id', 'pinned_important', 'not_important'])
-    .execute()
+  const scopedContacts = options.scope?.contactIds
+  const contacts =
+    scopedContacts !== undefined && scopedContacts.length === 0
+      ? []
+      : await (() => {
+          const query = exec
+            .selectFrom('contact')
+            .select(['id', 'pinned_important', 'not_important'])
+          return scopedContacts === undefined
+            ? query.execute()
+            : query.where('id', 'in', scopedContacts).execute()
+        })()
 
   // Only the warmth window is fetched. `last_interaction_at` and the 12-month count are set-based
   // aggregates and stay in SQL, because they are counts rather than a decay curve.
@@ -75,6 +94,7 @@ export async function recomputeMetrics(
       from interaction_contact ic
       join interaction i on i.id = ic.interaction_id
      where i.occurred_at >= (${windowStart}::date::timestamp at time zone ${timeZone})
+       and ${scopedContacts === undefined ? sql`true` : sql`ic.contact_id = any(${scopedContacts}::uuid[])`}
   `.execute(exec)
 
   const byContact = new Map<string, WarmthInteraction[]>()
@@ -102,9 +122,13 @@ export async function recomputeMetrics(
   })
 
   await writeWarmth(exec, warmth)
-  await writeContactAggregates(exec, options.today, timeZone)
-  await writeOrganizationAggregates(exec)
-  await sql`update workspace set metrics_swept_at = now()`.execute(exec)
+  await writeContactAggregates(exec, options.today, timeZone, scopedContacts)
+  await writeOrganizationAggregates(exec, options.scope?.organizationIds)
+  // A scoped run is not a sweep, and stamping the workspace as swept would make the nightly job of
+  // Stage 4 think it had nothing to do.
+  if (options.scope === undefined) {
+    await sql`update workspace set metrics_swept_at = now()`.execute(exec)
+  }
 
   const organizations = await exec
     .selectFrom('organization')
@@ -152,8 +176,11 @@ async function writeContactAggregates(
   exec: Executor,
   today: CivilDate,
   timeZone: string,
+  contactIds?: readonly string[],
 ): Promise<void> {
+  if (contactIds !== undefined && contactIds.length === 0) return
   const windowStart = addDays(today, -365)
+  const only = contactIds === undefined ? sql`true` : sql`c.id = any(${contactIds}::uuid[])`
 
   await sql`
     update contact_metrics m
@@ -169,6 +196,7 @@ async function writeContactAggregates(
           from contact c
           left join interaction_contact ic on ic.contact_id = c.id
           left join interaction i on i.id = ic.interaction_id
+         where ${only}
          group by c.id
       ) as agg
      where m.contact_id = agg.contact_id
@@ -185,6 +213,7 @@ async function writeContactAggregates(
                min(f.due_at) filter (where f.status = 'Open') as next_due
           from contact c
           left join follow_up f on f.contact_id = c.id
+         where ${only}
          group by c.id
       ) as agg
      where m.contact_id = agg.contact_id
@@ -196,7 +225,13 @@ async function writeContactAggregates(
  * past positions included — §6.3's "People" column is the organization's whole roster, and the
  * Connections tab is where current and past are told apart.
  */
-async function writeOrganizationAggregates(exec: Executor): Promise<void> {
+async function writeOrganizationAggregates(
+  exec: Executor,
+  organizationIds?: readonly string[],
+): Promise<void> {
+  if (organizationIds !== undefined && organizationIds.length === 0) return
+  const only =
+    organizationIds === undefined ? sql`true` : sql`o.id = any(${organizationIds}::uuid[])`
   await sql`
     update organization_metrics m
        set people_count = agg.people,
@@ -211,6 +246,7 @@ async function writeOrganizationAggregates(exec: Executor): Promise<void> {
                   join interaction i on i.id = io.interaction_id
                  where io.organization_id = o.id) as last_at
           from organization o
+         where ${only}
       ) as agg
      where m.organization_id = agg.organization_id
   `.execute(exec)

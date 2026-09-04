@@ -22,6 +22,7 @@ import {
 import {
   createInteraction,
   deleteRecord,
+  recomputeMetrics,
   listInteractions,
   listInteractionsByIds,
   updateInteraction,
@@ -29,7 +30,7 @@ import {
 } from '@mutuals/db'
 import { z } from 'zod'
 
-import type { AppContext } from '../context.ts'
+import { loadSettings, type AppContext } from '../context.ts'
 import { ApiError, validationFailed } from '../errors.ts'
 import { decodeCursor, encodeCursor } from '../http/cursor.ts'
 import { created201, ok200, ok200WithNotFound } from '../http/schema.ts'
@@ -125,6 +126,8 @@ export const interactionRoutes = routePlugin((app, ctx) => {
         organizationIds: body.organizationIds ?? [],
       })
 
+      await refreshMetricsFor(ctx, body.contactIds ?? [], body.organizationIds ?? [])
+
       const [created] = await serializeAll(ctx, await loadOne(ctx, id))
       if (created === undefined) throw new Error('the interaction vanished after its own insert')
       return reply.status(201).send(created)
@@ -149,6 +152,8 @@ export const interactionRoutes = routePlugin((app, ctx) => {
       const body = request.body
       await assertParticipantsExist(ctx, body.contactIds, body.organizationIds)
 
+      const [before] = await serializeAll(ctx, await loadOne(ctx, id))
+
       await updateInteraction(ctx.db, id, {
         ...(body.type === undefined ? {} : { type: body.type }),
         ...(body.occurredAt === undefined ? {} : { occurredAt: body.occurredAt }),
@@ -160,6 +165,18 @@ export const interactionRoutes = routePlugin((app, ctx) => {
 
       const [updated] = await serializeAll(ctx, await loadOne(ctx, id))
       if (updated === undefined) throw notFoundInteraction(id)
+
+      await refreshMetricsFor(
+        ctx,
+        [
+          ...(before?.contacts ?? []).map((ref) => ref.id),
+          ...updated.contacts.map((ref) => ref.id),
+        ],
+        [
+          ...(before?.organizations ?? []).map((ref) => ref.id),
+          ...updated.organizations.map((ref) => ref.id),
+        ],
+      )
       return updated
     },
   )
@@ -178,11 +195,45 @@ export const interactionRoutes = routePlugin((app, ctx) => {
     async (request) => {
       const id = request.params.id
       if (!(await recordExists(ctx, id, INTERACTION))) throw notFoundInteraction(id)
+
+      // Read the participants first: after the cascade there is nothing left to ask.
+      const [doomed] = await serializeAll(ctx, await loadOne(ctx, id))
       await deleteRecord(ctx.db, id)
+      await refreshMetricsFor(
+        ctx,
+        (doomed?.contacts ?? []).map((ref) => ref.id),
+        (doomed?.organizations ?? []).map((ref) => ref.id),
+      )
       return { id, deleted: true as const }
     },
   )
 })
+
+/**
+ * §4.7's derived columns, brought up to date for the people this interaction touches.
+ *
+ * An interaction is the only thing that moves `last_interaction_at`, `interaction_count_12m` and
+ * therefore warmth — so without this the Relationship card of §6.5 reads zero for ever and the
+ * numbers only ever change when the seed runs. Scoped to the participants (ADR-092): a workspace-
+ * wide recompute on every logged call is the shape of mistake that made deleting a contact take
+ * four seconds in Stage 1.
+ *
+ * The participants of the row *before* an edit matter as much as the ones after: moving an
+ * interaction from Anna to Bea has to take the count off Anna too, so both sets are passed in.
+ */
+async function refreshMetricsFor(
+  ctx: AppContext,
+  contactIds: readonly string[],
+  organizationIds: readonly string[],
+): Promise<void> {
+  if (contactIds.length === 0 && organizationIds.length === 0) return
+  const settings = await loadSettings(ctx)
+  await recomputeMetrics(ctx.db, {
+    today: settings.today,
+    timeZone: settings.timeZone,
+    scope: { contactIds: [...new Set(contactIds)], organizationIds: [...new Set(organizationIds)] },
+  })
+}
 
 function notFoundInteraction(id: string): ApiError {
   return new ApiError({
