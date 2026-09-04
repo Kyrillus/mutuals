@@ -60,8 +60,14 @@ pnpm db:up        # just the database (and it creates dev/test/e2e)
 pnpm db:migrate   # migrations run explicitly, never on boot
 pnpm seed         # ~200 contacts, 60 organizations, 500 interactions, 40 follow-ups
 pnpm verify       # what CI runs: verify:static + verify:db
-pnpm verify:full  # ...plus Playwright
+pnpm verify:e2e   # build, migrate mutuals_e2e, Playwright (its own CI job)
+pnpm verify:full  # ...all three
 ```
+
+The e2e suite drives a **built** SPA on ports 3200/3201, never the dev server on 3000/3001 — it
+truncates its database between tests and adopting `pnpm dev` would point that at `mutuals_dev`
+(ADR-088). Chromium is installed once with
+`pnpm --filter @mutuals/e2e exec playwright install chromium`.
 
 `pnpm` is reached through `corepack pnpm` if it is not on your PATH — and the composite `verify`
 scripts call `pnpm` themselves, so run `corepack enable pnpm` once or they fail with "command not
@@ -71,11 +77,10 @@ either. `docs/HANDOFF.md` has the rest of the environment notes.
 ## Stages
 
 1. ~~**Foundation**~~ — migrations, domain core, query compiler, API skeleton, seed. **Done**, PR #1.
-2. **Contacts table + Settings → Attributes** ← _current_. Sections 1–3 done (app shell in light and
-   dark; the DataTable, filter bar and contacts page; Settings and the attribute editor). **Section 4
-   remains**: Playwright e2e for the four flows §8.1 names, an empty-state and keyboard pass, then
-   the PR. See `docs/HANDOFF.md`.
-3. Organizations + relations + the contact detail page
+2. ~~**Contacts table + Settings → Attributes**~~ — app shell in light and dark; the DataTable, filter
+   bar and contacts page; Settings and the attribute editor; Playwright e2e and the keyboard pass.
+   **Done**, in PR #1 (ADR-089 — it grew to cover both stages rather than getting one of its own).
+3. **Organizations + relations + the contact detail page** ← _current_
 4. Follow-ups + dashboard + saved views
 5. Import wizard + duplicates + merge
 6. LLM layer (ask, quick capture, summaries) + command palette

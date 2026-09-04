@@ -19,13 +19,15 @@ Most CRMs are built for sales teams. This one is built for a person and their ne
 
 ## Status
 
-**Pre-alpha. Stage 1 of 7 is done: the engine runs and is documented. No user interface yet — that is Stage 2.**
+**Pre-alpha. Stages 1 and 2 of 7 are done: the engine runs, and so does the contacts table. Invent a
+field in Settings and it is a real column straight away — filterable, sortable, on every contact, with
+no deploy and no migration.**
 
 - [`docs/BRIEF.md`](./docs/BRIEF.md) — the product specification: data model, every screen, the build
   plan. The source of truth for product decisions. Reference screenshots in [`docs/refs/`](./docs/refs).
 - [`docs/PLAN.md`](./docs/PLAN.md) — the implementation plan, in two layers: a plain summary and the
   technical detail.
-- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 86 records.
+- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 89 records.
   `docs/adr-archive/` keeps the reasoning trail, including the designs that were rejected.
 
 ### Running it

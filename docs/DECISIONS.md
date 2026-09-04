@@ -2585,3 +2585,83 @@ export lands entirely in it rather than swamping the other one. Option 3 was rej
 change made to serve a seed script — if an OR group is ever wanted it should be wanted for its own
 reasons. The seed's count assertion caught this change immediately when the expected view count was
 still 4, which is the assertion working as designed.
+
+### ADR-087 — The e2e database gets its own guard, and the reset stays one implementation
+
+**Context.** ADR-079 says the Playwright run is "seeded from the same `resetDatabase()` the Vitest
+projects use". Building it revealed that it cannot literally call that function. `resetDatabase`
+reaches its database through `TEST_DATABASE_URL`, past `assertSafeTestDatabase`, which requires a
+name ending in `_test` — and `database.test.ts` has asserted since Stage 1 that it **refuses**
+`mutuals_e2e`, by name, as a deliberate case. It then clones per Vitest worker via `VITEST_POOL_ID`.
+None of those three things exist under Playwright.
+
+**Options.** (1) Widen the guard to accept `_e2e` as well, and flip the test that says it must not.
+(2) Give Playwright its own truncate-and-restore. (3) Keep one reset, add a second narrow guard.
+
+**Choice.** Option 3. `applyReset(db, truncate, baseline)` is extracted from `resetDatabase` and is
+now the single implementation both suites call; `packages/db/src/test-support/e2e.ts` supplies the
+connection and the guard around it. `assertSafeTestDatabase` and `assertSafeE2eDatabase` are two
+narrow predicates over one parameterised check, and each refuses the other's database.
+
+**Consequences.** Option 1 was the small diff and the wrong one: a single predicate accepting both
+suffixes turns a mistyped variable into a silent cross-suite truncate, which is the exact failure the
+`_test` guard exists to prevent. Option 2 would have satisfied ADR-079's letter and broken its
+intent — what that ADR protects is that "reset" means the same thing in both suites, and a second
+copy is how that stops being true. The Stage-1 test asserting `mutuals_e2e` is refused is unchanged
+and still passing; nine new cases assert the e2e guard refuses `_dev`, `_test`, a worker clone, a
+near-miss name and a remote host.
+
+There is one wrinkle the Vitest path does not have. `captureBaseline` refuses to read a baseline off
+a database that has been written to, and Vitest reads it from a template nothing ever writes to. The
+e2e database has no template, so `globalSetup` resets it with the _previous_ run's snapshot before
+capturing a new one. First run: no snapshot, and a freshly migrated database is already clean.
+Falsifier: delete the snapshot from `tmpdir` while the e2e database holds rows, and the run fails
+with `UnexpectedBaselineRowsError` rather than silently baking test data into the baseline. That is
+the right failure, but it is a failure — recreate the database if it happens.
+
+### ADR-088 — `verify:e2e`, and two corrections to ADR-082 it forced
+
+**Context.** ADR-082 specified `verify:e2e` as "build, migrate `mutuals_e2e`, Playwright", and stated
+in its consequences that `pnpm build` runs before e2e "because the e2e `webServer` previews a build
+output the script previously never produced". Implementing it found that sentence to be aspirational:
+the root `build` script was `pnpm --filter @mutuals/api build` and nothing else, so **CI had never
+once built the SPA**, and `vite preview` would have served an empty directory.
+
+**Options.** (1) Have the `webServer` command build, so the config is self-contained. (2) Fix the
+root script so `pnpm build` means what ADR-082 says it means.
+
+**Choice.** Option 2, plus a `globalSetup` assertion. `build` is now API **and** web, which also puts
+the SPA build into `verify:static` and therefore into the CI job that has been silently skipping it.
+`globalSetup` fails with an actionable sentence if `apps/web/dist/index.html` is missing rather than
+letting nine specs time out against a blank page.
+
+The second correction: `vite.config.ts` had `server.proxy` but no `preview.proxy`. ADR-011 rules out
+CORS, so a previewed SPA had no route to Fastify at all and every spec would have failed on its first
+`/api` call. `preview` now proxies, binds `127.0.0.1` explicitly — `localhost` resolves to `::1` here
+and Playwright polls `127.0.0.1`, which cost one debugging round — and takes its ports from the
+environment.
+
+**Consequences.** An ADR describing a fix in the past tense is worse than one describing it in the
+future tense, because nobody re-reads it to check. Both statements in ADR-082 are true now. The
+e2e servers run on **3200/3201**, not 3000/3001, and `reuseExistingServer` is `false`: a developer
+with `pnpm dev` running would otherwise have Playwright adopt those servers and drive the suite —
+truncating between every test — against `mutuals_dev`.
+
+### ADR-089 — Stage 2 ships inside PR #1, retitled, and PR #1 is still not merged
+
+**Context.** §8.2 asks for one PR per stage. PR #1's head branch is `version/claude-v1`, which is the
+working branch, so the four Stage 2 commits had already flowed into it before anyone noticed: the PR
+titled "Stage 1 — Foundation" in fact contained Stage 1 and three quarters of Stage 2. GitHub allows
+one open PR per head/base pair, so `docs/HANDOFF.md`'s instruction to "open the Stage 2 PR against
+`main`" was not executable.
+
+**Options.** (1) A stacked PR #2 from a new branch, based on `version/claude-v1`. (2) Let PR #1 grow
+and retitle it. (3) Repoint PR #1 at a Stage-1-only branch, then open PR #2 for all of Stage 2.
+
+**Choice.** Option 2, chosen by Simon on 2026-09-04 after the three were put to him.
+
+**Consequences.** One review of fifteen commits instead of two smaller ones — the cost he accepted to
+avoid Stage 2 being split across two PRs. **PR #1 is still never merged**: that instruction was about
+the divergence from `main`, which is untouched and is revisited at Stage 7. Retitling and rewriting
+the body is not merging. `docs/HANDOFF.md`'s "next step, verbatim" is corrected in this stage, because
+a fresh session following it would otherwise try to open a PR that cannot exist.

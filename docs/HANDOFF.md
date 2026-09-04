@@ -12,22 +12,25 @@ talked to.
 
 ## Where the work stopped
 
-**Stage 1 — Foundation: done.** Green CI, [PR #1](https://github.com/Kyrillus/mutuals/pull/1).
-**Stage 2 — Contacts table + attributes: sections 1–3 of 4 done.**
+**Stage 1 — Foundation: done.** **Stage 2 — Contacts table + attributes: done.** Both live in
+[PR #1](https://github.com/Kyrillus/mutuals/pull/1), which grew to cover them together and was
+retitled — see ADR-089 for why, and why that was Simon's call rather than a default.
 
-|               |                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------- |
-| Section 1     | App shell, router, API client, design tokens in light and dark, theme switcher         |
-| Section 2     | The shared `DataTable`, the two per-type registries, the filter bar, the contacts page |
-| Section 3     | Settings navigation, the attributes list, the create/edit attribute dialog             |
-| **Section 4** | **Not started.** Playwright e2e, empty-state and keyboard pass, then the Stage 2 PR    |
+|           |                                                                                        |
+| --------- | -------------------------------------------------------------------------------------- |
+| Section 1 | App shell, router, API client, design tokens in light and dark, theme switcher         |
+| Section 2 | The shared `DataTable`, the two per-type registries, the filter bar, the contacts page |
+| Section 3 | Settings navigation, the attributes list, the create/edit attribute dialog             |
+| Section 4 | Playwright e2e, the keyboard pass, the third CI job                                    |
 
-`pnpm verify` is green: 1,150 unit tests, 311 integration tests, lint, typecheck and build clean.
+`pnpm verify` is green: 1,158 unit tests, 311 integration tests, lint, typecheck and build clean.
+`pnpm verify:e2e` is green: 7 specs, 2 `fixme`.
 
 **Do not merge PR #1.** `main` has moved on — another session built a getmutuals.ai waitlist site in
 `site/`, which this branch never touches. Merging PR #1 today would delete the old German Next.js
 prototype from `main`, and Simon's instruction was to leave it there. The only real conflict is two
 lines of `.gitignore`. Simon has said explicitly: **do nothing about it.** Revisit at Stage 7.
+Retitling the PR and rewriting its body is not merging, and ADR-089 records that he asked for it.
 
 ## What only existed in the chat, and now exists here
 
@@ -57,15 +60,29 @@ macOS. Node 24.20.0. Postgres runs in Docker.
 ```bash
 corepack enable pnpm          # once. The composite verify scripts call `pnpm` themselves,
                               # so without this they fail with "command not found".
-export PATH="$HOME/.docker/bin:$PATH"   # Docker Desktop is not on the default PATH here
+# Neither Homebrew's bin nor Docker Desktop's is on the default PATH of a non-interactive shell
+# here, so node, pnpm, docker and gh all read as "command not found" until this line runs.
+export PATH="/opt/homebrew/bin:$HOME/.docker/bin:$PATH"
 pnpm install
 pnpm dev                      # database up, migrated, API on :3001, web on :3000
 pnpm seed                     # 200 contacts, 60 organizations, 500 interactions, 40 follow-ups
 pnpm verify                   # what CI runs
 ```
 
-Two traps that already cost time once each, both now guarded but worth knowing:
+```bash
+pnpm --filter @mutuals/e2e exec playwright install chromium   # once, ~95 MB
+pnpm verify:e2e               # build, migrate mutuals_e2e, Playwright
+pnpm verify:full              # verify + verify:e2e
+```
 
+Four traps that already cost time once each, all now guarded but worth knowing:
+
+- **`localhost` resolves to `::1` here, and half the tooling polls `127.0.0.1`.** Two servers can
+  both "succeed" on port 3000 — one on IPv6, one on IPv4 — and neither errors. This is why
+  `vite.config.ts`'s `preview` block binds `127.0.0.1` explicitly, and it is the first thing to
+  suspect whenever something is listening and nothing can reach it.
+- **`process.loadEnvFile` and `--env-file` do not override a variable already in the environment.**
+  A wrapper that exports `PORT` wins over `.env` silently, and the API ends up on the wrong port.
 - **`vite build` ships React's development JSX runtime** unless `NODE_ENV=production` is set _before_
   Vite is imported. Not from Vite's build mode, not from the config function — the plugin reads it at
   import time. `apps/web/scripts/build.mjs` handles it and asserts its own output.
@@ -76,25 +93,29 @@ Two traps that already cost time once each, both now guarded but worth knowing:
 
 Paste this as the first message of the new session:
 
-> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §5.2, §6.2 and §8.1.
+> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §4.3, §6.3 and §6.5.
 >
-> Build **Stage 2, section 4**, which closes the stage:
+> Build **Stage 3 — Organizations, relations and the contact detail page**:
 >
-> 1. **Playwright end-to-end tests** for the four flows §8.1 names, as far as the built features
->    allow: create an attribute → it appears as a column → filter by it; create a contact → it
->    appears in the table; a saved-view round trip through the URL. The interaction and follow-up
->    flows arrive in Stages 3 and 4 — write them as `test.fixme` with the intended assertions rather
->    than skipping them silently. `e2e/` does not exist yet; ADR-079 and `docs/DECISIONS.md` §8
->    describe how it is wired and how it seeds. Add the third CI job that runs `verify:e2e`.
-> 2. **An empty-state and keyboard pass** over what exists: every table and page has a real empty
->    state with a call to action; tab order is sane; the sticky column and the dialogs are reachable
->    without a mouse.
-> 3. **Update the docs** — `docs/PLAN.md`'s stage table, `CLAUDE.md`'s stage marker, and
->    `README.md`'s status — then open the Stage 2 PR against `main` **without merging it**, in the
->    shape of PR #1: plain summary, technical detail, how to try it, a definition-of-done checklist.
+> 1. **Organizations**: the list page over the shared `DataTable` (§6.3) and the organization detail
+>    page. The table already exists and is driven by attribute definitions — a second object type
+>    should cost almost no new table code, and if it does, say so rather than copying the file.
+> 2. **Relations** (§4.3): contact↔organization links carry their own attributes — job title, from,
+>    to, primary. They live in `record_link`, which Stage 1 built and nothing has yet exercised
+>    through the UI. Work history renders current → past.
+> 3. **The contact detail page** (§6.5): Overview / Activities / Connections / Follow-ups, the
+>    attribute sidebar, and the value-history popover showing source and date for every field. The
+>    summary card stays a stub until Stage 6. Interactions CRUD lands here too.
+> 4. **Turn `e2e/specs/interaction-and-follow-up.spec.ts` from `fixme` into a real test** as far as
+>    Stage 3 reaches — the interaction half. Its assertions are already written; changing one is
+>    fine, but say why in the PR body. It also notes that a fixed clock has to be decided on before
+>    the date assertions can be exact.
+>
+> Everything goes on `version/claude-v1` and therefore into PR #1, which now covers Stages 1–3
+> (ADR-089). **Still do not merge it.**
 >
 > Verify by running things, not by reading them. An agent's self-report is not evidence: the browser
-> and the database are. Report back in the two layers §0 requires.
+> and the database are. `pnpm verify:full` is the gate. Report back in the two layers §0 requires.
 
 ## How the two people want to be talked to
 
