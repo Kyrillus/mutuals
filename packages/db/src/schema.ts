@@ -497,6 +497,9 @@ export const SCHEMA = {
     errors: col('jsonb', { default: true }),
     duplicate_of: col('uuid', { null: true }),
     decision: oneOf(IMPORT_DECISIONS, { null: true }),
+    // -- 0009 (ADR-097) --
+    duplicate_of_row: col('int4', { null: true }),
+    duplicate_detail: col('jsonb', { null: true }),
   },
 
   // -- 0006 -------------------------------------------------------------------------------------

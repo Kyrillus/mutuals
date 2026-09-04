@@ -42,6 +42,17 @@ export * from './identity/website.ts'
 export * from './followups/recurrence.ts'
 export * from './followups/state.ts'
 
+// §6.8's import wizard: the CSV reader, the auto-mapping cascade and the date-format inference.
+// The XLSX reader is not here — exceljs is a Node library, so it lives in `apps/api` and produces
+// the same `string[][]` this module consumes (ADR-096).
+export * from './import/automap.ts'
+export * from './import/csv.ts'
+export * from './import/dates.ts'
+export * from './import/header.ts'
+export * from './import/presets.ts'
+export * from './import/synonyms.ts'
+export * from './import/targets.ts'
+
 // The API contract. Request and response schemas live here, not in `apps/api`, because the
 // frontend imports them instead of generating a client (ADR-030).
 export * from './contracts/index.ts'

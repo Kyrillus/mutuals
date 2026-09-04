@@ -71,7 +71,7 @@ not before.
 written, and they are in §16 of `docs/DECISIONS.md` rather than above.** Read ADR-095 to ADR-098
 before starting Stage 5. In short: the pg-boss pooler test ships skipped and R7 stays open (095);
 CSV and XLSX land in Stage 5 and vCard does not (096); duplicates inside a single file get their own
-row pointer in migration 0006 (097); and **the session split below changed** — Session A owns §6.8
+row pointer in migration 0009 (097); and **the session split below changed** — Session A owns §6.8
 entire, including duplicate detection, and the acceptance test's numbers were wrong (098).
 
 **Q4** (Simon, 2026-09-04): a near-certain duplicate is **not** silently pre-decided.
@@ -176,7 +176,7 @@ Paste this as the first message of the new session:
 > makes the acceptance test runnable at the end of A.
 >
 > `import_batch` and `import_row` exist from migration 0005 and nothing has touched them; ADR-097
-> adds `duplicate_of_row` to `import_row` in migration 0006. `PLANNED_OPERATIONS` holds **eleven**
+> adds `duplicate_of_row` to `import_row` in migration **0009** (0006 to 0008 are taken). `PLANNED_OPERATIONS` holds **eleven**
 > reserved names: eight for the import (`createImportBatch` … `getImportErrorReport`) and three for
 > merge (`mergeContacts`, `previewMergeContacts`, `mergeOrganizations`), which belong to session B.
 > Move them into `OPERATIONS` as you implement them rather than inventing names —

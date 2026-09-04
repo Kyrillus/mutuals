@@ -2924,8 +2924,18 @@ been committed and has no id.
 same run; the Review grid shows no chips for them. (2) A nullable `duplicate_of_row` beside
 `duplicate_of`, mutually exclusive. (3) Pre-create records at parse time so every row has an id.
 
-**Choice.** Option 2. Migration 0006 adds `duplicate_of_row integer`, a `CHECK` that at most one of
-the two pointers is set, and a foreign key on `(batch_id, duplicate_of_row)` back to `import_row`.
+**Choice.** Option 2. Migration **0009** adds `duplicate_of_row integer`, a `CHECK` that at most one
+of the two pointers is set, and a foreign key on `(batch_id, duplicate_of_row)` back to `import_row`.
+Not 0006 — 0006 to 0008 are `llm_call`, the cascade indexes and the identifier plausibility predicate.
+
+Two things the migration adds that this ADR did not originally name. A **`duplicate_of_row <
+row_number` check**, so a chain always has a first element: without it two rows can name each other
+and "collapse to the first kept row" has no first row to find. And **`duplicate_detail jsonb`**,
+holding `{band, confidence, rules, evidence, label}` — because the Review grid is paged and
+recomputing the match per page load is 10k probes per scroll. It is the same opaque-blob reasoning as
+`import_batch.mapping`: read whole, written whole, never filtered on. What _is_ filtered on is
+"does this row have a duplicate at all", and both partial indexes serve that. A third check keeps
+`duplicate_detail` from existing without a pointer to explain.
 
 **Consequences.** Option 1 fails the acceptance test on the test's own terms — the chips it asserts
 are for pairs that exist only inside the file — and worse, it would mean the _first_ import of a
