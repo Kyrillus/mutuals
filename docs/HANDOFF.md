@@ -30,8 +30,8 @@ snooze, and the Follow-ups tab on a contact — §6.1's dashboard, and §6.6's s
 answered and shipped (ADR-093); ADR-094 records what building views settled.
 
 `pnpm verify` is green: 1,160 unit tests, 311 integration tests, lint, typecheck and build clean.
-`pnpm verify:e2e` is green: 17 specs, 1 `fixme` — and that one is the LinkedIn import, which is
-exactly what Stage 5 turns into a real test.
+`pnpm verify:e2e` is green: **18 specs — 17 run, 1 `fixme`**. That one is the LinkedIn import, and it
+is exactly what Stage 5 turns into a real test.
 
 **Do not merge PR #1.** `main` has moved on — another session built a getmutuals.ai waitlist site in
 `site/`, which this branch never touches. Merging PR #1 today would delete the old German Next.js
@@ -84,6 +84,25 @@ of §14 plus an explicit prompt rather than a silent skip. **Q6 is answered** to
   `<label for>`, which names form controls and not buttons, so their accessible name is their
   current _value_ ("Short text") rather than "Type". Harmless on screen, wrong for a screen reader,
   and it is what made the regression test above brittle.
+
+## Documents that are part of every stage's definition of done
+
+§8.3 names them; this is the operational version, with what enforces each.
+
+| File                   | Keep current with                                          | Guarded by                              |
+| ---------------------- | ---------------------------------------------------------- | --------------------------------------- |
+| `README.md`            | Status line, stage count, ADR count                        | nothing — read it                       |
+| `CLAUDE.md`            | Stage marker, commands, conventions                        | nothing — read it                       |
+| `docs/PLAN.md`         | The stage table's status column                            | nothing — read it                       |
+| `docs/DECISIONS.md`    | One ADR per decision not covered by the brief              | nothing — read it                       |
+| `docs/HANDOFF.md`      | This file, rewritten at the end of every stage             | nothing — read it                       |
+| `docs/ARCHITECTURE.md` | Data flow, extension points, measured latencies            | nothing — read it                       |
+| `docs/openapi.json`    | **Regenerated with `pnpm openapi`** after any route change | `openapi.test.ts` fails the build       |
+| `docs/ERRORS.md`       | An anchor for every error `type` URI the API can return    | `errors.test.ts` fails the build        |
+| `.env.example`         | Every variable any package reads                           | `env.test.ts` compares it to the schema |
+
+The last three fail CI if you forget. The first six do not, which is exactly why they are the ones
+that rot — and why this file gets rewritten rather than appended to.
 
 ## The environment, exactly
 
@@ -165,8 +184,13 @@ Paste this as the first message of the new session:
 >
 > Everything goes on `version/claude-v1` and therefore into PR #1 (ADR-089). **Still do not merge it.**
 >
+> **Closing the stage**, after session B and not before: `docs/PLAN.md`'s stage table, `CLAUDE.md`'s
+> stage marker, `README.md`'s status and ADR count, `docs/HANDOFF.md` rewritten for Stage 6 — then
+> retitle PR #1 and rewrite its body to cover Stages 1–5, keeping the "Scope note" block at the top.
+> Session A ends with green CI and commits pushed, and leaves the stage markers alone.
+>
 > Verify by running things, not by reading them. `pnpm verify:full` is the gate. Report back in the
-> two layers §0 requires.
+> two layers §0 requires, and stop for approval.
 
 ## How the two people want to be talked to
 
@@ -175,6 +199,15 @@ Brief §0, and it is not decoration — it is the thing most easily dropped unde
 **Simon** is the product owner and is not a developer. Plain language, short sentences, concrete
 examples, no file paths and no code in his layer. He asks good, sharp questions about cost and about
 whether a thing actually works; answer them with numbers you measured, not impressions.
+
+**He writes in German about as often as in English, and switches mid-thread.** Answer his layer in
+whichever language he last used. This does **not** change CLAUDE.md's rule that the repository is
+English throughout — code, comments, docs, commit messages and UI stay English no matter what
+language the conversation is in. The technical layer is for his co-founder and stays English.
+
+He is also worth arguing with productively: twice he pushed back on something ("does that make the
+app slow?", "are you sure the handover is complete?") and was right both times — the first forced a
+measurement, the second found six errors in this file.
 
 **His co-founder** is a senior engineer who reviews architecture. Give him the trade-off, the thing
 you are unsure about, and what would falsify the decision.
