@@ -49,4 +49,6 @@ export * from './repositories/records.ts'
 // The derived columns of §4.7. `apps/api` recomputes them, scoped, whenever an interaction moves
 // them; the seed and the eventual nightly sweep call the same function unscoped (ADR-092).
 export { recomputeMetrics } from './seed/metrics.ts'
+export { sweepIfStale } from './seed/stale-sweep.ts'
+export type { StaleSweepOptions, StaleSweepResult } from './seed/stale-sweep.ts'
 export type { MetricsOptions, MetricsResult } from './seed/metrics.ts'
