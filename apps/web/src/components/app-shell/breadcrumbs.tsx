@@ -13,7 +13,11 @@ export function Breadcrumbs() {
   const crumbs = useMatches({
     select: (matches): Crumb[] =>
       matches.flatMap((match) => {
-        const label = match.staticData.crumb
+        // A detail route's crumb is the record's own name, which is not knowable until it is
+        // loaded, so its loader returns one. Every other route declares a static crumb and no
+        // loader data at all — hence the fallback rather than a second mechanism.
+        const loaded: unknown = (match.loaderData as { crumb?: unknown } | undefined)?.crumb
+        const label = typeof loaded === 'string' ? loaded : match.staticData.crumb
         return label === undefined ? [] : [{ label, to: match.pathname }]
       }),
   })

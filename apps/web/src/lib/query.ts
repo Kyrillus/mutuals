@@ -50,4 +50,12 @@ export const qk = {
   recordList: (objectType: string, query: Readonly<Record<string, unknown>>) =>
     ['records', objectType, query] as const,
   record: (id: string) => ['record', id] as const,
+  /** §6.5's Connections tab: organizations, people and who else works there, in one operation. */
+  connections: (id: string) => ['connections', id] as const,
+  /** §4.5's history popover — per record *and* per attribute, because it is fetched when opened. */
+  valueHistory: (id: string, attributeId: string) => ['value-history', id, attributeId] as const,
+  /** Every interaction timeline for one record, whatever the type filter is set to. */
+  interactions: (recordId: string) => ['interactions', recordId] as const,
+  interactionList: (recordId: string, query: Readonly<Record<string, unknown>>) =>
+    ['interactions', recordId, query] as const,
 }

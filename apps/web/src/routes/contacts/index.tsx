@@ -27,7 +27,7 @@ const DEFAULT_COLUMNS = [
 /** §6.2's create dialog, which names a shorter list than the default view does. */
 const DIALOG_FIELDS = ['email', 'phone', 'organization', 'job_role', 'city'] as const
 
-export const Route = createFileRoute('/contacts')({
+export const Route = createFileRoute('/contacts/')({
   component: ContactsPage,
   // ADR-047: filters, sort, columns and the view live in the URL, so a link is a view.
   validateSearch: validateListSearch,
@@ -35,7 +35,6 @@ export const Route = createFileRoute('/contacts')({
   // view's name while the working copy drifts. Inline rather than the shared constant so the
   // middleware's schema is inferred from this route's own search type.
   search: { middlewares: [retainSearchParams(['view'])] },
-  staticData: { crumb: 'Contacts' },
 })
 
 function ContactsPage() {

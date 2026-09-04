@@ -10,10 +10,14 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ContactsRouteImport } from './routes/contacts'
+import { Route as ContactsRouteRouteImport } from './routes/contacts/route'
 import { Route as FollowUpsRouteImport } from './routes/follow-ups'
-import { Route as OrganizationsRouteImport } from './routes/organizations'
+import { Route as OrganizationsRouteRouteImport } from './routes/organizations/route'
 import { Route as SettingsRouteRouteImport } from './routes/settings/route'
+import { Route as ContactsIndexRouteImport } from './routes/contacts/index'
+import { Route as ContactsIdRouteImport } from './routes/contacts/$id'
+import { Route as OrganizationsIndexRouteImport } from './routes/organizations/index'
+import { Route as OrganizationsIdRouteImport } from './routes/organizations/$id'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsContactsRouteRouteImport } from './routes/settings/contacts/route'
 import { Route as SettingsOrganizationsRouteRouteImport } from './routes/settings/organizations/route'
@@ -30,7 +34,7 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ContactsRoute = ContactsRouteImport.update({
+const ContactsRouteRoute = ContactsRouteRouteImport.update({
   id: '/contacts',
   path: '/contacts',
   getParentRoute: () => rootRouteImport,
@@ -40,7 +44,7 @@ const FollowUpsRoute = FollowUpsRouteImport.update({
   path: '/follow-ups',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OrganizationsRoute = OrganizationsRouteImport.update({
+const OrganizationsRouteRoute = OrganizationsRouteRouteImport.update({
   id: '/organizations',
   path: '/organizations',
   getParentRoute: () => rootRouteImport,
@@ -49,6 +53,26 @@ const SettingsRouteRoute = SettingsRouteRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ContactsIndexRoute = ContactsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ContactsRouteRoute,
+} as any)
+const ContactsIdRoute = ContactsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ContactsRouteRoute,
+} as any)
+const OrganizationsIndexRoute = OrganizationsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => OrganizationsRouteRoute,
+} as any)
+const OrganizationsIdRoute = OrganizationsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => OrganizationsRouteRoute,
 } as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
@@ -108,13 +132,17 @@ const SettingsOrganizationsViewsRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/contacts': typeof ContactsRouteRouteWithChildren
+  '/organizations': typeof OrganizationsRouteRouteWithChildren
   '/settings': typeof SettingsRouteRouteWithChildren
-  '/contacts': typeof ContactsRoute
   '/follow-ups': typeof FollowUpsRoute
-  '/organizations': typeof OrganizationsRoute
   '/settings/contacts': typeof SettingsContactsRouteRouteWithChildren
   '/settings/organizations': typeof SettingsOrganizationsRouteRouteWithChildren
+  '/contacts/$id': typeof ContactsIdRoute
+  '/organizations/$id': typeof OrganizationsIdRoute
   '/settings/profile': typeof SettingsProfileRoute
+  '/contacts/': typeof ContactsIndexRoute
+  '/organizations/': typeof OrganizationsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/settings/contacts/attributes': typeof SettingsContactsAttributesRoute
   '/settings/contacts/views': typeof SettingsContactsViewsRoute
@@ -125,10 +153,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/contacts': typeof ContactsRoute
   '/follow-ups': typeof FollowUpsRoute
-  '/organizations': typeof OrganizationsRoute
+  '/contacts/$id': typeof ContactsIdRoute
+  '/organizations/$id': typeof OrganizationsIdRoute
   '/settings/profile': typeof SettingsProfileRoute
+  '/contacts': typeof ContactsIndexRoute
+  '/organizations': typeof OrganizationsIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/settings/contacts/attributes': typeof SettingsContactsAttributesRoute
   '/settings/contacts/views': typeof SettingsContactsViewsRoute
@@ -140,13 +170,17 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/contacts': typeof ContactsRouteRouteWithChildren
+  '/organizations': typeof OrganizationsRouteRouteWithChildren
   '/settings': typeof SettingsRouteRouteWithChildren
-  '/contacts': typeof ContactsRoute
   '/follow-ups': typeof FollowUpsRoute
-  '/organizations': typeof OrganizationsRoute
   '/settings/contacts': typeof SettingsContactsRouteRouteWithChildren
   '/settings/organizations': typeof SettingsOrganizationsRouteRouteWithChildren
+  '/contacts/$id': typeof ContactsIdRoute
+  '/organizations/$id': typeof OrganizationsIdRoute
   '/settings/profile': typeof SettingsProfileRoute
+  '/contacts/': typeof ContactsIndexRoute
+  '/organizations/': typeof OrganizationsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/settings/contacts/attributes': typeof SettingsContactsAttributesRoute
   '/settings/contacts/views': typeof SettingsContactsViewsRoute
@@ -159,13 +193,17 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/settings'
     | '/contacts'
-    | '/follow-ups'
     | '/organizations'
+    | '/settings'
+    | '/follow-ups'
     | '/settings/contacts'
     | '/settings/organizations'
+    | '/contacts/$id'
+    | '/organizations/$id'
     | '/settings/profile'
+    | '/contacts/'
+    | '/organizations/'
     | '/settings/'
     | '/settings/contacts/attributes'
     | '/settings/contacts/views'
@@ -176,10 +214,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/contacts'
     | '/follow-ups'
-    | '/organizations'
+    | '/contacts/$id'
+    | '/organizations/$id'
     | '/settings/profile'
+    | '/contacts'
+    | '/organizations'
     | '/settings'
     | '/settings/contacts/attributes'
     | '/settings/contacts/views'
@@ -190,13 +230,17 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/settings'
     | '/contacts'
-    | '/follow-ups'
     | '/organizations'
+    | '/settings'
+    | '/follow-ups'
     | '/settings/contacts'
     | '/settings/organizations'
+    | '/contacts/$id'
+    | '/organizations/$id'
     | '/settings/profile'
+    | '/contacts/'
+    | '/organizations/'
     | '/settings/'
     | '/settings/contacts/attributes'
     | '/settings/contacts/views'
@@ -208,10 +252,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ContactsRouteRoute: typeof ContactsRouteRouteWithChildren
+  OrganizationsRouteRoute: typeof OrganizationsRouteRouteWithChildren
   SettingsRouteRoute: typeof SettingsRouteRouteWithChildren
-  ContactsRoute: typeof ContactsRoute
   FollowUpsRoute: typeof FollowUpsRoute
-  OrganizationsRoute: typeof OrganizationsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -227,7 +271,7 @@ declare module '@tanstack/react-router' {
       id: '/contacts'
       path: '/contacts'
       fullPath: '/contacts'
-      preLoaderRoute: typeof ContactsRouteImport
+      preLoaderRoute: typeof ContactsRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/follow-ups': {
@@ -241,7 +285,7 @@ declare module '@tanstack/react-router' {
       id: '/organizations'
       path: '/organizations'
       fullPath: '/organizations'
-      preLoaderRoute: typeof OrganizationsRouteImport
+      preLoaderRoute: typeof OrganizationsRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -250,6 +294,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/contacts/': {
+      id: '/contacts/'
+      path: '/'
+      fullPath: '/contacts/'
+      preLoaderRoute: typeof ContactsIndexRouteImport
+      parentRoute: typeof ContactsRouteRoute
+    }
+    '/contacts/$id': {
+      id: '/contacts/$id'
+      path: '/$id'
+      fullPath: '/contacts/$id'
+      preLoaderRoute: typeof ContactsIdRouteImport
+      parentRoute: typeof ContactsRouteRoute
+    }
+    '/organizations/': {
+      id: '/organizations/'
+      path: '/'
+      fullPath: '/organizations/'
+      preLoaderRoute: typeof OrganizationsIndexRouteImport
+      parentRoute: typeof OrganizationsRouteRoute
+    }
+    '/organizations/$id': {
+      id: '/organizations/$id'
+      path: '/$id'
+      fullPath: '/organizations/$id'
+      preLoaderRoute: typeof OrganizationsIdRouteImport
+      parentRoute: typeof OrganizationsRouteRoute
     }
     '/settings/': {
       id: '/settings/'
@@ -324,6 +396,33 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ContactsRouteRouteChildren {
+  ContactsIdRoute: typeof ContactsIdRoute
+  ContactsIndexRoute: typeof ContactsIndexRoute
+}
+
+const ContactsRouteRouteChildren: ContactsRouteRouteChildren = {
+  ContactsIdRoute: ContactsIdRoute,
+  ContactsIndexRoute: ContactsIndexRoute,
+}
+
+const ContactsRouteRouteWithChildren = ContactsRouteRoute._addFileChildren(
+  ContactsRouteRouteChildren,
+)
+
+interface OrganizationsRouteRouteChildren {
+  OrganizationsIdRoute: typeof OrganizationsIdRoute
+  OrganizationsIndexRoute: typeof OrganizationsIndexRoute
+}
+
+const OrganizationsRouteRouteChildren: OrganizationsRouteRouteChildren = {
+  OrganizationsIdRoute: OrganizationsIdRoute,
+  OrganizationsIndexRoute: OrganizationsIndexRoute,
+}
+
+const OrganizationsRouteRouteWithChildren =
+  OrganizationsRouteRoute._addFileChildren(OrganizationsRouteRouteChildren)
+
 interface SettingsContactsRouteRouteChildren {
   SettingsContactsAttributesRoute: typeof SettingsContactsAttributesRoute
   SettingsContactsViewsRoute: typeof SettingsContactsViewsRoute
@@ -379,10 +478,10 @@ const SettingsRouteRouteWithChildren = SettingsRouteRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ContactsRouteRoute: ContactsRouteRouteWithChildren,
+  OrganizationsRouteRoute: OrganizationsRouteRouteWithChildren,
   SettingsRouteRoute: SettingsRouteRouteWithChildren,
-  ContactsRoute: ContactsRoute,
   FollowUpsRoute: FollowUpsRoute,
-  OrganizationsRoute: OrganizationsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,7 +1,10 @@
 import type { AttributeDefinitionDto, FieldDescriptor } from '@mutuals/core'
 import { useRef, useState, type ReactNode } from 'react'
 
+import { Link } from '@tanstack/react-router'
+
 import { AttributeCell } from '@/attributes/attribute-cell.tsx'
+import { useDisplay } from '@/attributes/display-context.tsx'
 import { attributeTypeOf, toDraft, toWriteValue } from '@/attributes/value.ts'
 
 import { AttributeControl } from './attribute-control.tsx'
@@ -35,19 +38,25 @@ export function RecordCell({
 }
 
 /**
- * §6.2's sticky first column: avatar plus display name.
+ * §6.2's sticky first column: avatar plus display name, linking to the detail page.
  *
- * Text rather than a link, because `/contacts/$id` is Stage 3 (§6.5) and a link into a route that
- * does not exist is worse than none. This span is the only thing that changes when it lands.
+ * Stage 2 left this as text and said so: "a link into a route that does not exist is worse than
+ * none. This span is the only thing that changes when it lands." It has landed, and this is that
+ * change. `recordHref` comes from the display context rather than being spelled out here, so the
+ * cell does not learn the URL grammar of every object type.
  */
 function LabelCell({ row }: { row: RecordRow }) {
+  const { recordHref } = useDisplay()
   return (
-    <span className="flex items-center gap-2 overflow-hidden">
+    <Link
+      to={recordHref(row.objectType, row.id)}
+      className="flex items-center gap-2 overflow-hidden hover:underline"
+    >
       <Avatar size="sm" className="shrink-0">
         <AvatarFallback className="text-[10px]">{initialsOf(row.displayName)}</AvatarFallback>
       </Avatar>
       <span className="truncate font-medium">{row.displayName}</span>
-    </span>
+    </Link>
   )
 }
 
