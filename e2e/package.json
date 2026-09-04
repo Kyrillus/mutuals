@@ -1,0 +1,18 @@
+{
+  "name": "@mutuals/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright end-to-end tests: the four flows of brief §8.1.",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "dependencies": {
+    "@mutuals/db": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

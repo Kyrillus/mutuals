@@ -50,3 +50,43 @@ jobs:
       - name: Create the test database
         run: PGPASSWORD=mutuals psql -h localhost -U mutuals -d mutuals_dev -c 'CREATE DATABASE mutuals_test'
       - run: pnpm verify:db
+
+  # The third job of ADR-083, which arrives now that there is an e2e suite for it to run. Like the
+  # other two it calls one composite script and nothing else: re-listing the steps here is how a
+  # green CI run and a green local run stop meaning the same thing (ADR-082).
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: mutuals
+          POSTGRES_PASSWORD: mutuals
+          POSTGRES_DB: mutuals_dev
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U mutuals -d mutuals_dev"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      DATABASE_URL: postgres://mutuals:mutuals@localhost:5432/mutuals_dev
+      E2E_DATABASE_URL: postgres://mutuals:mutuals@localhost:5432/mutuals_e2e
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+      - run: pnpm install --frozen-lockfile
+      - name: Create the e2e database
+        run: PGPASSWORD=mutuals psql -h localhost -U mutuals -d mutuals_dev -c 'CREATE DATABASE mutuals_e2e'
+      # Run from the package: Playwright's CLI is not on PATH at the workspace root (ADR-079).
+      - name: Install Chromium
+        run: pnpm --filter @mutuals/e2e exec playwright install --with-deps chromium
+      - run: pnpm verify:e2e
+      - name: Upload the report when it fails
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
