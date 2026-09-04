@@ -2465,7 +2465,9 @@ was considered and rejected as over-engineering for Phase 1; §9's intro-suggest
 ADR-002: Docker Desktop is now installed and `pgvector/pgvector:pg16` was verified working, so the
 repo ships Postgres 16 exactly as §3.1 fixes it.
 
-### Still open
+### Asked, and how each was settled
+
+Every one of these is answered except **Q7**, which is not needed until the LLM layer of Stage 6.
 
 **Q3 — "No interaction in 90 days" (Simon). ANSWERED — see ADR-086.** §6.2 seeds that view. Does it include people you have
 **never** contacted? Options: **(a)** exclude them, and seed a second view `Never contacted`
@@ -2476,9 +2478,12 @@ filter model is AND-only by design.
 
 **Q4 — Import review grid: what is pre-selected for a near-certain duplicate (Simon). Answered 2026-09-04.** None of the three options as written. Simon asked for the row to be flagged and the user _told_: "this looks like a contact you already have — do you really want to import it?", with **not importing** as the default. So it is option (a)'s behaviour — re-importing the same export stays a no-op and nothing is silently overwritten — but stated as a question rather than as a silent skip, so the person sees why the row did not land. Stage 5 builds it that way.
 
-**Q5 — Dark mode in Phase 1 (Simon).** §5.1 does not mention it. The tokens cost nothing and are
-already specified; a tested toggle plus dark screenshots in every stage report is about half a day.
-Recommendation: **tokens now, toggle in Stage 7**.
+**Q5 — Dark mode in Phase 1 (Simon). ANSWERED 2026-09-03 — both ship.** The recommendation below was
+"tokens now, toggle in Stage 7"; Simon overrode it and asked for both modes with a three-state
+switcher (light / dark / system, following the OS live). Built in Stage 2, which is also why
+`apps/web/src/styles/contrast.test.ts` exists — it found a grey that was unreadable on grey. This
+supersedes ADR-056's "dark tokens ship but there is no toggle". _Original wording:_ §5.1 does not
+mention it; the tokens cost nothing and a tested toggle is about half a day.
 
 **Q6 — Overnight jobs on a laptop (Simon). Answered 2026-09-04 — ADR-093.** He chose (a), run it
 at startup when stale, on the condition that it is cheap. It is: 27 ms for the 156 contacts of

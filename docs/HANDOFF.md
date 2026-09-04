@@ -16,12 +16,10 @@ talked to.
 [PR #1](https://github.com/Kyrillus/mutuals/pull/1), which grew to cover them together and was
 retitled — see ADR-089 for why, and why that was Simon's call rather than a default.
 
-|           |                                                                                        |
-| --------- | -------------------------------------------------------------------------------------- |
-| Section 1 | App shell, router, API client, design tokens in light and dark, theme switcher         |
-| Section 2 | The shared `DataTable`, the two per-type registries, the filter bar, the contacts page |
-| Section 3 | Settings navigation, the attributes list, the create/edit attribute dialog             |
-| Section 4 | Playwright e2e, the keyboard pass, the third CI job                                    |
+**Stage 1** built the engine: migrations, the fact log and its projector, the attribute registry,
+the filter compiler, the API and the seed. **Stage 2** built the app shell in light and dark, the one
+shared `DataTable` with its filter bar and inline editing, Settings → Attributes, and the Playwright
+suite with the third CI job.
 
 **Stage 3** added the organizations table and detail page, contact↔organization links through the
 UI, §6.5's contact detail page with its four tabs, interactions CRUD, and §4.5's value-history
@@ -57,9 +55,19 @@ questions in `docs/DECISIONS.md` §14; they are repeated here because they are e
   the OS live). This supersedes ADR-056's "dark tokens ship but there is no toggle", and it is why
   `apps/web/src/styles/contrast.test.ts` exists — it found a real failure when it was written.
 - **Simon has approved how the app looks.** He ran it and said so. Do not redesign the shell.
+- **Bugs go to him the moment he finds one, not in a batch** (asked and answered 2026-09-04). His
+  reasoning is the right one: a collected bug has lost its context by the time anybody reads it. The
+  agreement in return is that _trivial_ fixes happen on the spot, and anything needing a design
+  choice is brought to him rather than decided quietly.
+- **One stage, one session.** Each stage — and for a large one, each half — starts a fresh chat with
+  the prompt below. That is why this file has to be complete: it is the only thing that crosses the
+  gap. If something matters and lives only in a transcript, it is lost.
 
-Still open, none of them blocking, all in `docs/DECISIONS.md` §14 with a recommendation:
-**Q4 is answered** (Simon, 2026-09-04): a near-certain duplicate is **not** silently pre-decided.
+**One question is still open, and it is not needed until Stage 6:** **Q7** — the LLM daily spending
+cap defaults to **$2.00/day** and nobody has confirmed that number. Ask when the LLM layer starts,
+not before. Everything Stage 5 needs is settled.
+
+**Q4** (Simon, 2026-09-04): a near-certain duplicate is **not** silently pre-decided.
 The row is flagged and the user is asked in as many words — _"this looks like a contact you already
 have: do you really want to import it?"_ — with **not importing** as the default. That is option (a)
 of §14 plus an explicit prompt rather than a silent skip. **Q6 is answered** too: ADR-093, built.
@@ -99,7 +107,7 @@ pnpm verify:e2e               # build, migrate mutuals_e2e, Playwright
 pnpm verify:full              # verify + verify:e2e
 ```
 
-Four traps that already cost time once each, all now guarded but worth knowing:
+Traps that already cost time once each, all now guarded but worth knowing:
 
 - **`localhost` resolves to `::1` here, and half the tooling polls `127.0.0.1`.** Two servers can
   both "succeed" on port 3000 — one on IPv6, one on IPv4 — and neither errors. This is why
@@ -135,16 +143,21 @@ Paste this as the first message of the new session:
 >
 > **Session A — the wizard and what lands.** §6.8's five steps: upload, map columns, fix errors in
 > an editable grid, review, commit. `import_batch` and `import_row` exist from migration 0005 and
-> nothing has touched them. Eight operation names are already reserved in `PLANNED_OPERATIONS`
-> (`createImportBatch` … `getImportErrorReport`) — move them across rather than inventing names.
+> nothing has touched them. `PLANNED_OPERATIONS` holds **eleven** reserved names: eight for the
+> import (`createImportBatch` … `getImportErrorReport`) and three for merge (`mergeContacts`,
+> `previewMergeContacts`, `mergeOrganizations`), which belong to session B. Move them into
+> `OPERATIONS` as you implement them rather than inventing names — `operations.test.ts` asserts the
+> two arrays stay disjoint, so a name in both fails the build.
 > `fixtures/linkedin_connections_sample.csv` and `google_contacts_sample.csv` are the fixtures, and
 > the LinkedIn one has three preamble lines before its header on purpose.
 >
 > **Session B — duplicates and merge.** §4.6's identity matching already exists and is unit-tested
 > in `packages/core`: exact on a normalised identifier is near-certain, name similarity is only ever
-> the fallback. §6.9's merge UI is the new part. **Q4 needs Simon** before session B: what is
-> preselected for a near-certain duplicate in the review grid (`docs/DECISIONS.md` §14, with a
-> recommendation). Ask it at the start of that session, not the end.
+> the fallback. §6.9's merge UI is the new part. **Q4 is already answered — do not ask it again:**
+> a near-certain duplicate is flagged and the user is asked in as many words ("this looks like a
+> contact you already have — do you really want to import it?"), with _not importing_ as the
+> default. Same outcome as §14's option (a), but stated as a question so the person sees why the row
+> did not land. `docs/DECISIONS.md` §14 has it verbatim.
 >
 > **`e2e/specs/import-linkedin-csv.spec.ts` is the acceptance test** and it is already written, as
 > `fixme`, with the numbers it expects and why: the fixture holds two deliberate collisions, one
