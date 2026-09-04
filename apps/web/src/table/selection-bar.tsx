@@ -2,14 +2,7 @@ import { DownloadIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/ui/button.tsx'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/ui/dialog.tsx'
+import { ConfirmDialog } from '@/ui/confirm-dialog.tsx'
 
 /**
  * §5.2's bulk action bar.
@@ -64,37 +57,15 @@ export function SelectionBar({
         </div>
       </div>
 
-      <Dialog open={confirming} onOpenChange={setConfirming}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete {subject}?</DialogTitle>
-            <DialogDescription>
-              This will delete {subject} and everything attached to them — interactions, follow-ups
-              and the value history behind every field. It cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setConfirming(false)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={busy}
-              onClick={() => {
-                setConfirming(false)
-                onDelete()
-              }}
-            >
-              Delete {subject}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={`Delete ${subject}?`}
+        description={`This will delete ${subject} and everything attached to them — interactions, follow-ups and the value history behind every field. It cannot be undone.`}
+        confirmLabel={`Delete ${subject}`}
+        busy={busy}
+        onConfirm={onDelete}
+      />
     </>
   )
 }
