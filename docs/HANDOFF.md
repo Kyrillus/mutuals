@@ -65,7 +65,14 @@ questions in `docs/DECISIONS.md` §14; they are repeated here because they are e
 
 **One question is still open, and it is not needed until Stage 6:** **Q7** — the LLM daily spending
 cap defaults to **$2.00/day** and nobody has confirmed that number. Ask when the LLM layer starts,
-not before. Everything Stage 5 needs is settled.
+not before.
+
+**Everything Stage 5 needs is settled — but four things were settled _after_ this file was first
+written, and they are in §16 of `docs/DECISIONS.md` rather than above.** Read ADR-095 to ADR-098
+before starting Stage 5. In short: the pg-boss pooler test ships skipped and R7 stays open (095);
+CSV and XLSX land in Stage 5 and vCard does not (096); duplicates inside a single file get their own
+row pointer in migration 0006 (097); and **the session split below changed** — Session A owns §6.8
+entire, including duplicate detection, and the acceptance test's numbers were wrong (098).
 
 **Q4** (Simon, 2026-09-04): a near-certain duplicate is **not** silently pre-decided.
 The row is flagged and the user is asked in as many words — _"this looks like a contact you already
@@ -155,39 +162,61 @@ Traps that already cost time once each, all now guarded but worth knowing:
 
 Paste this as the first message of the new session:
 
-> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §6.8, §6.9 and §4.6.
+> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §6.8, §6.9 and §4.6, then
+> `docs/DECISIONS.md` **§16** — ADR-095 to ADR-098, settled after this file was first written,
+> and they change the split below and the acceptance test's numbers.
 >
 > Build **Stage 5 — the import wizard, duplicate detection and merge**. It is the largest stage left
 > and splits cleanly in two; do the first half, stop, and report.
 >
-> **Session A — the wizard and what lands.** §6.8's five steps: upload, map columns, fix errors in
-> an editable grid, review, commit. `import_batch` and `import_row` exist from migration 0005 and
-> nothing has touched them. `PLANNED_OPERATIONS` holds **eleven** reserved names: eight for the
-> import (`createImportBatch` … `getImportErrorReport`) and three for merge (`mergeContacts`,
-> `previewMergeContacts`, `mergeOrganizations`), which belong to session B. Move them into
-> `OPERATIONS` as you implement them rather than inventing names — `operations.test.ts` asserts the
-> two arrays stay disjoint, so a name in both fails the build.
-> `fixtures/linkedin_connections_sample.csv` and `google_contacts_sample.csv` are the fixtures, and
-> the LinkedIn one has three preamble lines before its header on purpose.
+> **Session A — §6.8 entire (ADR-098).** The brief's five steps, in the brief's own words:
+> **Upload → Sheet → Map columns → Review → Done**. Not the four-step paraphrase an earlier version
+> of this file gave; step 2 is sheet selection and step 4 is the editable grid _plus_ duplicate
+> detection. Duplicate detection is Session A's, not Session B's — ADR-098 says why, and it is what
+> makes the acceptance test runnable at the end of A.
 >
-> **Session B — duplicates and merge.** §4.6's identity matching already exists and is unit-tested
-> in `packages/core`: exact on a normalised identifier is near-certain, name similarity is only ever
-> the fallback. §6.9's merge UI is the new part. **Q4 is already answered — do not ask it again:**
+> `import_batch` and `import_row` exist from migration 0005 and nothing has touched them; ADR-097
+> adds `duplicate_of_row` to `import_row` in migration 0006. `PLANNED_OPERATIONS` holds **eleven**
+> reserved names: eight for the import (`createImportBatch` … `getImportErrorReport`) and three for
+> merge (`mergeContacts`, `previewMergeContacts`, `mergeOrganizations`), which belong to session B.
+> Move them into `OPERATIONS` as you implement them rather than inventing names —
+> `operations.test.ts` asserts the two arrays stay disjoint, so a name in both fails the build.
+>
+> Formats are **CSV and XLSX only** (ADR-096): `exceljs`, streaming, and a committed generator for
+> the multi-sheet fixture. vCard's dropdown entry ships disabled with a reason.
+> `fixtures/linkedin_connections_sample.csv` and `google_contacts_sample.csv` are the CSV fixtures,
+> and the LinkedIn one has three preamble lines before its header on purpose.
+>
+> Three things Session A needs that do not exist yet and are easy to miss: the **database half of
+> duplicate matching** (`matchDuplicates` lives in `packages/core` with no SQL behind it — batch the
+> identifier probes, ADR-042), **find-or-create for organizations** (nothing in
+> `packages/db/src/write/` does it, and the LinkedIn preset needs it to link with `title = Position`
+> and `from = Connected On`), and **`apps/worker`** (ADR-062: created in Stage 5, not before).
+>
+> **Session B — merge, and merge only (ADR-098).** §4.6's identity matching already exists and is
+> unit-tested in `packages/core`, and Session A built the SQL behind it: exact on a normalised
+> identifier is near-certain, name similarity is only ever the fallback. §6.9's merge UI is the new
+> part. **Q4 is already answered — do not ask it again:**
 > a near-certain duplicate is flagged and the user is asked in as many words ("this looks like a
 > contact you already have — do you really want to import it?"), with _not importing_ as the
 > default. Same outcome as §14's option (a), but stated as a question so the person sees why the row
 > did not land. `docs/DECISIONS.md` §14 has it verbatim.
 >
-> **`e2e/specs/import-linkedin-csv.spec.ts` is the acceptance test** and it is already written, as
-> `fixme`, with the numbers it expects and why: the fixture holds two deliberate collisions, one
-> exact-identifier and one diacritic-fold. Changing an assertion is allowed; say why in the PR body.
+> **`e2e/specs/import-linkedin-csv.spec.ts` is the acceptance test**, it is written as `fixme`, and
+> **its numbers are wrong** — ADR-098 has the measurement. It claims 6 data rows and two collisions;
+> the fixture holds **31 data rows and five detectable pairs** (six once `pg_trgm` is in play), and
+> its comment mis-classifies the Håkansson pair as fuzzy when the two rows share a `linkedin_url`
+> exactly. It also assumes the exact duplicate is preselected to merge, which Q4 overruled. Rewrite
+> it against ADR-098's table rather than un-`fixme`-ing it, and it becomes green at the end of
+> Session A, not Session B.
 >
 > Everything goes on `version/claude-v1` and therefore into PR #1 (ADR-089). **Still do not merge it.**
 >
 > **Closing the stage**, after session B and not before: `docs/PLAN.md`'s stage table, `CLAUDE.md`'s
 > stage marker, `README.md`'s status and ADR count, `docs/HANDOFF.md` rewritten for Stage 6 — then
 > retitle PR #1 and rewrite its body to cover Stages 1–5, keeping the "Scope note" block at the top.
-> Session A ends with green CI and commits pushed, and leaves the stage markers alone.
+> Session A ends with green CI — `pnpm verify:full`, the rewritten acceptance test included — and
+> commits pushed, and leaves the stage markers alone.
 >
 > Verify by running things, not by reading them. `pnpm verify:full` is the gate. Report back in the
 > two layers §0 requires, and stop for approval.

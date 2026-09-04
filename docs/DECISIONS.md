@@ -2394,9 +2394,12 @@ gate would catch a mid-flight edit. If `unaccent` is unavailable at all, `mutual
 `lower(btrim($1))` — one line, then a reproject, losing only accent-insensitivity.
 
 **R7 — pg-boss is maintained by one person, and pooler safety is unmeasured.** _Falsifier:_ the
-Stage-5 lifecycle test against a Supabase transaction-pooler connection string. _Mitigation already
-in place:_ the `JobQueue` port is three methods and one adapter file; `DROP SCHEMA pgboss CASCADE` is
-a complete uninstall; Graphile Worker is named in `ARCHITECTURE.md`.
+Stage-5 lifecycle test against a Supabase transaction-pooler connection string. **Still open after
+Stage 5, deliberately (ADR-095):** the test is written and skips unless `POOLER_DATABASE_URL` is
+set, and no managed instance exists yet. Closing it is one environment variable, not a research task.
+_Mitigation already in place:_ the `JobQueue` port is three methods and one adapter file;
+`DROP SCHEMA pgboss CASCADE` is a complete uninstall; Graphile Worker is named in
+`ARCHITECTURE.md`.
 
 **R8 — `strict: true` on structured outputs is a hint, and compliance varies by upstream provider for
 the same model.** _Falsifier:_ the repair rate per prompt version, which is a `SELECT` against
@@ -2848,3 +2851,145 @@ snapshot is composed, and a second editor would be a second definition of what a
 migration's comment describing `saved_view.columns` as `[{slug, width?}]` has never matched the
 implementation, which stores plain slugs; an applied migration is not edited, so it is corrected
 here instead.
+
+---
+
+## 16. Stage 5 scope decisions — settled before the build
+
+Four decisions the Stage 5 handover left open or got wrong. Unlike §15's, none of these were forced
+by a measurement: three are Simon's answers to questions put to him on 2026-09-04, and the fourth is
+a correction to the acceptance test that reading the fixture produced. They are recorded before the
+build rather than after it because the handover's verbatim prompt is the only thing that crosses a
+session gap, and all four change what that prompt has to say.
+
+### ADR-095 — The pooler lifecycle test ships gated, and R7 stays open
+
+**Context.** ADR-058 chose pg-boss and claimed it is safe through Supabase's transaction pooler,
+reasoning from `pg_advisory_xact_lock()` being transaction-scoped. §13's **R7** names the falsifier
+precisely: a Stage-5 lifecycle test against a transaction-pooler connection string. No such string
+exists. `.env.example` carries three local databases and nothing else, and nothing in the repository
+references a managed instance.
+
+**Options.** (1) Simon creates a free Supabase project now and the test runs for real. (2) The test
+ships gated on an environment variable and skips when it is absent; R7 stays open. (3) Delete the
+planned test and accept ADR-058's reasoning.
+
+**Choice.** Option 2 (Simon, 2026-09-04). `POOLER_DATABASE_URL`, optional and unset by default,
+commented out in `.env.example`. The lifecycle test skips with a message naming the variable.
+
+**Consequences.** R7's entry now states that the test exists and what closes it, so the risk is open
+with a one-line remedy rather than open with a research task. Writing the test and skipping it is the
+whole point: a skipped test with a named reason is visible in every run's output, whereas an absent
+test is visible nowhere, and this claim has already survived one stage on reasoning alone. Option 3
+was rejected for the same reason — it would mark R7 closed on the evidence of nothing.
+`env.test.ts` compares `.env.example` against the schema, so the variable has to be **optional with
+no default**, a shape the env schema had not needed until now; a default would silently point the
+pooler test at local Postgres and pass vacuously, which is the one outcome worse than skipping.
+
+### ADR-096 — Import formats: CSV and XLSX now, vCard deferred and shown disabled
+
+**Context.** §6.8 step 1 offers four source formats — `Generic CSV/Excel`, `LinkedIn Connections
+export`, `Google Contacts CSV`, `Apple Contacts vCard (.vcf)` — and step 2 (**Sheet**) exists solely
+to pick a sheet out of a multi-sheet workbook. ADR-054 put parsing on the server. Only CSV fixtures
+exist.
+
+**Options.** (1) CSV only; Excel and vCard in a later stage. (2) CSV and XLSX now, vCard later.
+(3) All four, and cut Stage 5 into three sessions rather than two.
+
+**Choice.** Option 2 (Simon, 2026-09-04). `exceljs` for XLSX through its streaming reader. The vCard
+entry in the dropdown renders **disabled with a reason** rather than hidden — the same pattern Stage 2
+used for the `Bulk import` menu item itself, so the menu does not change shape when the format lands.
+
+**Consequences.** Step 2 stops being dead code. It fires only for a workbook with more than one
+sheet, so without XLSX it could not be exercised at all, and an untested wizard step is worse than an
+absent one. That forces a fixture: `fixtures/contacts_multi_sheet.xlsx`, generated by a committed
+script so the binary is reproducible rather than opaque — a checked-in workbook nobody can regenerate
+is a fixture that cannot be corrected. SheetJS's `xlsx` on npm is deliberately **not** used: recent
+releases moved to the maintainers' own CDN and the registry copy is the stale pre-move build.
+`exceljs`'s streaming reader is what keeps §6.8's 10k-row requirement honest; parsing a whole
+workbook into memory is the failure mode it exists to avoid. Deferring vCard also defers a real
+design question rather than only work: a vCard is a stream of records with repeating typed fields,
+not a grid, so §6.8's one-card-per-source-column mapping UI has no obvious meaning for it.
+
+### ADR-097 — Duplicates inside one batch get a row pointer beside the record pointer
+
+**Context.** Migration 0005 gives `import_row` a `duplicate_of uuid REFERENCES record(id)`, and
+`packages/core`'s `CandidatePool` is keyed on `recordId`. Both model exactly one thing: this row
+matches a record that already exists. But every collision in
+`fixtures/linkedin_connections_sample.csv` is row-against-row **inside the same file**, and the e2e
+database is truncated before each spec, so nothing pre-exists. At Review time the earlier row has not
+been committed and has no id.
+
+**Options.** (1) Match inside a batch only at commit time, against records created earlier in the
+same run; the Review grid shows no chips for them. (2) A nullable `duplicate_of_row` beside
+`duplicate_of`, mutually exclusive. (3) Pre-create records at parse time so every row has an id.
+
+**Choice.** Option 2. Migration 0006 adds `duplicate_of_row integer`, a `CHECK` that at most one of
+the two pointers is set, and a foreign key on `(batch_id, duplicate_of_row)` back to `import_row`.
+
+**Consequences.** Option 1 fails the acceptance test on the test's own terms — the chips it asserts
+are for pairs that exist only inside the file — and worse, it would mean the _first_ import of a
+LinkedIn export silently creates the duplicates the wizard exists to catch. Option 3 inverts the
+design: rows would land before the user confirmed, and "nothing is saved before confirmation" is the
+promise the Review step is there to keep. The row pointer costs one nullable column and buys a
+distinction the UI should be making anyway — _"you already have this contact"_ and _"this file lists
+this person twice"_ read differently to a person and deserve different wording.
+`matchDuplicates` needs no change: an uncommitted row enters the pool under a synthetic
+`row:<n>` id which the caller maps back, and the matcher never dereferences `recordId`.
+
+**The consequence that is not obvious.** Pointing at an uncommitted row makes that row's own decision
+load-bearing: if row 1 is skipped, row 2's "duplicate of row 1" is stale, and a naive
+implementation imports neither. Resolution is positional and decided here rather than discovered
+later — a chain collapses to its **first kept row**, recomputed whenever any decision in the chain
+changes. Three rows for one person with the first two skipped means the third lands, not that all
+three vanish.
+
+### ADR-098 — Session A owns §6.8 entire; the split in the handover was wrong
+
+**Context.** `docs/HANDOFF.md`'s verbatim prompt splits Stage 5 as "Session A — the wizard and what
+lands" and "Session B — duplicates and merge". But §6.8's **step 4 contains duplicate detection**:
+the chips, the per-row `Skip` / `Merge into existing` / `Create anyway` choice, and the bulk choice.
+The documented split therefore cuts through the middle of one wizard step.
+
+**Options.** (1) Keep the split: Session A ships a Review grid with no duplicate chips, and the
+acceptance test stays `fixme` until Session B. (2) Session A owns §6.8 entire, including detection
+and display; Session B owns §6.9 merge alone. (3) Three sessions.
+
+**Choice.** Option 2 (Simon, 2026-09-04).
+
+**Consequences.** The acceptance test goes live at the end of Session A rather than Session B, which
+is the reason to prefer this: it is the only test that exercises the whole flow, and a stage half
+that cannot run its own acceptance test has no gate. Session A grows by the database half of
+duplicate matching — identifier probes **batched** per ADR-042, since one probe per identifier per
+row is 20k+ round trips on a 10k export, and name candidates through `pg_trgm`. That query is the
+missing half of `matchDuplicates`, which until now existed only in `packages/core` and its own unit
+test. Session A also absorbs find-or-create for organizations, which nothing in
+`packages/db/src/write/` does and which the LinkedIn preset requires in order to link with
+`title = Position` and `from = Connected On`. Session B is then §6.9 alone, and the three merge names
+stay in `PLANNED_OPERATIONS` through Session A.
+
+**The acceptance test's numbers are wrong, and the handover repeats them.**
+`e2e/specs/import-linkedin-csv.spec.ts` says _"the fixture holds two deliberate collisions"_ and
+_"The file holds 6 data rows; two pairs collapse to one contact each, so 4 contacts land"_, and
+asserts `Rows: 4`. Measured, by parsing the fixture and running the real `matchDuplicates` over it:
+
+| row | contact           | matches | band       | confidence | rule                                 |
+| --- | ----------------- | ------- | ---------- | ---------- | ------------------------------------ |
+| 2   | Anna Berger       | 1       | `certain`  | 0.970      | `identifier` (same email)            |
+| 4   | Bjoern Hakansson  | 3       | `certain`  | 0.990      | `identifier` (same LinkedIn profile) |
+| 8   | Marta Nowak       | 7       | `probable` | 0.880      | `name_exact_org_same`                |
+| 12  | Ekatarina Volkova | 11      | `possible` | 0.740      | `name_fuzzy_org_same`                |
+| 15  | Lukas Mueller     | 14      | `possible` | 0.740      | `name_fuzzy_org_same`                |
+
+**31 data rows, not 6. Five pairs, not two** — six once the real candidate query runs, since Jonas
+Weber / J. Weber needs `pg_trgm` to enter the pool at all and then lands on
+`name_initial_org_same`. The fixture is markedly better than the test that was written against it,
+and carries four edge cases the comment never mentions: a multiline quoted `Position`, an empty
+`First Name`, `not-an-email`, and an empty `Company`. Two further corrections. The spec reasons that
+the Håkansson pair is _"a fuzzy match, not an exact one"_, which is wrong on §4.6's own terms — they
+share a `linkedin_url` exactly, and the matcher agrees at 0.990. And the spec assumes the exact
+duplicate is _"preselected to merge"_, which **Q4 overruled**: nothing is pre-decided, the user is
+asked, and not importing is the default. The Marta Nowak pair, built to exercise `emailMatchKey`'s
+gmail dot-and-plus folding, correctly lands `probable` rather than `certain`, because that key is a
+duplicate signal and never a stored identifier (ADR-042), so the ≥0.95-single-identifier gate caps
+it. The rewritten test asserts these numbers.

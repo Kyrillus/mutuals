@@ -29,7 +29,7 @@ the dashboard shows what needs you, and any table you have filtered can be saved
   plan. The source of truth for product decisions. Reference screenshots in [`docs/refs/`](./docs/refs).
 - [`docs/PLAN.md`](./docs/PLAN.md) — the implementation plan, in two layers: a plain summary and the
   technical detail.
-- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 94 records.
+- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 98 records.
   `docs/adr-archive/` keeps the reasoning trail, including the designs that were rejected.
 
 ### Running it
