@@ -1,0 +1,347 @@
+/*
+ * Mutuals design tokens — the whole visual identity, in one file (ADR-056).
+ *
+ * Tailwind 4 is configured in CSS; there is no `tailwind.config.js` and adding one would be
+ * ignored. Three rules make this file work and are easy to break:
+ *
+ *   1. `@theme inline` is what lets a utility resolve through a `var()` that `.dark` overrides.
+ *      A plain `@theme` copies the value at build time, so dark mode would silently do nothing.
+ *   2. Every class name a component uses must appear in the source as a literal string. A class
+ *      built by interpolation is invisible to the scanner and renders unstyled, which is exactly
+ *      the trap the chip palette walks into — see `ui/chip.tsx`.
+ *   3. The token *names* are shadcn's. That is the whole point: a future `shadcn add` drops a
+ *      component in and it is already wearing Mutuals' colours.
+ */
+
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+ * Automatic source detection resolves relative to the process's working directory, which is
+ * `apps/web` only because that is where `pnpm dev` happens to run. Naming the directory removes
+ * the dependency on where the command was typed.
+ */
+@source '../';
+
+/*
+ * `index.html` puts `.dark` on <html> before first paint. `:is(.dark, .dark *)` matches the root
+ * element *and* its descendants — shadcn's stock `&:is(.dark *)` misses the root itself — and
+ * borrows `.dark`'s specificity, so a dark utility always beats the light one it overrides
+ * regardless of the order Tailwind happens to emit them in.
+ */
+@custom-variant dark (&:is(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.21 0.006 265);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.006 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.006 265);
+
+  /* The sidebar tint, table zebra striping and disabled surfaces all come from here. */
+  --muted: oklch(0.97 0.002 265);
+  /* Labels, placeholders and empty cells. Dark enough to clear 4.5:1 *on `--muted`*, not just on
+     white — the earlier value cleared white at 4.85:1 and failed a zebra row at 4.45:1. */
+  --muted-foreground: oklch(0.52 0.012 265);
+
+  /* The one accent (§5.1). Indigo: legible on white, calm, not brand-y. */
+  --primary: oklch(0.5 0.155 264);
+  --primary-foreground: oklch(0.99 0 0);
+  --accent: oklch(0.96 0.014 264);
+  --accent-foreground: oklch(0.42 0.14 264);
+
+  --secondary: oklch(0.97 0.002 265);
+  --secondary-foreground: oklch(0.28 0.008 265);
+
+  /* §6.4 renders overdue dates in this colour as plain text on white, so it is held to a text
+     contrast ratio rather than the button-fill ratio a `--destructive` usually gets. */
+  --destructive: oklch(0.54 0.2 27);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  /* Thin borders (§5.1): hairlines, not boxes. */
+  --border: oklch(0.925 0.004 265);
+  --input: oklch(0.9 0.005 265);
+  --ring: oklch(0.5 0.155 264);
+
+  --sidebar: oklch(0.985 0.002 265);
+  --sidebar-foreground: oklch(0.3 0.008 265);
+  --sidebar-primary: oklch(0.5 0.155 264);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.955 0.004 265);
+  --sidebar-accent-foreground: oklch(0.28 0.008 265);
+  --sidebar-border: oklch(0.92 0.004 265);
+  --sidebar-ring: oklch(0.5 0.155 264);
+
+  /* Reserved by shadcn's chart components. Nothing renders them yet; they exist so `shadcn add
+     chart` does not invent its own palette on top of this one. */
+  --chart-1: oklch(0.5 0.155 264);
+  --chart-2: oklch(0.58 0.11 195);
+  --chart-3: oklch(0.62 0.12 155);
+  --chart-4: oklch(0.68 0.13 75);
+  --chart-5: oklch(0.56 0.16 350);
+
+  --radius: 0.375rem;
+
+  /* Layout constants the shell reads. They are lengths, not colours, so they do not change
+     between the two themes and are declared once. */
+  --sidebar-width: 15rem;
+  --sidebar-width-collapsed: 3.25rem;
+  --content-max: 75rem;
+  --topbar-height: 3rem;
+  /* Fixed and load-bearing: the virtualiser multiplies by it instead of measuring (ADR-053). */
+  --row-height: 2.5rem;
+  --header-height: 2.25rem;
+
+  /*
+   * The eleven option chips (§5.2). `attribute_option.color` stores one of these token names,
+   * never a hex string, so a colour chosen in one theme cannot be unreadable in the other.
+   * Each pair is a background and the text that sits on it; `contrast.test.ts` proves every one
+   * of them clears 4.5:1 in both themes.
+   */
+  --chip-gray-bg: oklch(0.96 0.003 265);
+  --chip-gray-fg: oklch(0.4 0.01 265);
+  --chip-slate-bg: oklch(0.95 0.008 240);
+  --chip-slate-fg: oklch(0.42 0.02 250);
+  --chip-red-bg: oklch(0.95 0.03 25);
+  --chip-red-fg: oklch(0.47 0.15 25);
+  --chip-orange-bg: oklch(0.95 0.035 65);
+  --chip-orange-fg: oklch(0.47 0.13 55);
+  --chip-amber-bg: oklch(0.96 0.04 95);
+  --chip-amber-fg: oklch(0.46 0.11 80);
+  --chip-green-bg: oklch(0.95 0.035 155);
+  --chip-green-fg: oklch(0.44 0.11 155);
+  --chip-teal-bg: oklch(0.95 0.03 190);
+  --chip-teal-fg: oklch(0.44 0.095 195);
+  --chip-blue-bg: oklch(0.95 0.03 250);
+  --chip-blue-fg: oklch(0.46 0.135 255);
+  --chip-indigo-bg: oklch(0.95 0.032 275);
+  --chip-indigo-fg: oklch(0.46 0.15 272);
+  --chip-violet-bg: oklch(0.95 0.032 300);
+  --chip-violet-fg: oklch(0.47 0.15 300);
+  --chip-pink-bg: oklch(0.95 0.03 350);
+  --chip-pink-fg: oklch(0.48 0.145 350);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: oklch(0.17 0.006 265);
+  --foreground: oklch(0.94 0.003 265);
+
+  /* Cards and popovers sit *above* the page here, so they get lighter rather than darker — the
+     inverse of the light theme, where they are white on a tinted page. */
+  --card: oklch(0.2 0.006 265);
+  --card-foreground: oklch(0.94 0.003 265);
+  --popover: oklch(0.2 0.006 265);
+  --popover-foreground: oklch(0.94 0.003 265);
+
+  --muted: oklch(0.24 0.006 265);
+  --muted-foreground: oklch(0.66 0.01 265);
+
+  --primary: oklch(0.7 0.14 264);
+  --primary-foreground: oklch(0.17 0.006 265);
+  --accent: oklch(0.27 0.03 264);
+  --accent-foreground: oklch(0.86 0.07 264);
+
+  --secondary: oklch(0.25 0.006 265);
+  --secondary-foreground: oklch(0.92 0.003 265);
+
+  --destructive: oklch(0.68 0.175 27);
+  --destructive-foreground: oklch(0.17 0.006 265);
+
+  /* Translucent, not a flat grey: a hairline has to read the same over the page, a card and a
+     popover, which are three different backgrounds. */
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.7 0.14 264);
+
+  --sidebar: oklch(0.19 0.006 265);
+  --sidebar-foreground: oklch(0.88 0.004 265);
+  --sidebar-primary: oklch(0.7 0.14 264);
+  --sidebar-primary-foreground: oklch(0.17 0.006 265);
+  --sidebar-accent: oklch(0.25 0.006 265);
+  --sidebar-accent-foreground: oklch(0.92 0.003 265);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.7 0.14 264);
+
+  --chart-1: oklch(0.7 0.14 264);
+  --chart-2: oklch(0.72 0.1 195);
+  --chart-3: oklch(0.75 0.11 155);
+  --chart-4: oklch(0.79 0.12 75);
+  --chart-5: oklch(0.71 0.14 350);
+
+  --chip-gray-bg: oklch(0.28 0.006 265);
+  --chip-gray-fg: oklch(0.8 0.01 265);
+  --chip-slate-bg: oklch(0.28 0.014 245);
+  --chip-slate-fg: oklch(0.8 0.025 245);
+  --chip-red-bg: oklch(0.3 0.06 25);
+  --chip-red-fg: oklch(0.82 0.11 25);
+  --chip-orange-bg: oklch(0.3 0.06 65);
+  --chip-orange-fg: oklch(0.83 0.105 70);
+  --chip-amber-bg: oklch(0.3 0.055 95);
+  --chip-amber-fg: oklch(0.85 0.1 90);
+  --chip-green-bg: oklch(0.29 0.055 155);
+  --chip-green-fg: oklch(0.82 0.1 155);
+  --chip-teal-bg: oklch(0.29 0.05 190);
+  --chip-teal-fg: oklch(0.82 0.085 195);
+  --chip-blue-bg: oklch(0.29 0.06 250);
+  --chip-blue-fg: oklch(0.82 0.105 255);
+  --chip-indigo-bg: oklch(0.29 0.062 275);
+  --chip-indigo-fg: oklch(0.82 0.11 272);
+  --chip-violet-bg: oklch(0.29 0.062 300);
+  --chip-violet-fg: oklch(0.83 0.11 300);
+  --chip-pink-bg: oklch(0.29 0.058 350);
+  --chip-pink-fg: oklch(0.83 0.108 350);
+}
+
+/*
+ * `inline` because every value here is a `var()` that `.dark` rewrites at runtime. Drop the
+ * keyword and Tailwind bakes the light value into each utility, leaving dark mode inert.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /*
+   * Registering the chips in the colour namespace is what makes `bg-chip-red-bg` a real,
+   * scannable utility. The alternative — a functional `@utility chip-*` — cannot work: its
+   * wildcard has to resolve through a theme namespace, and the call site would still have to
+   * interpolate the class name.
+   */
+  --color-chip-gray-bg: var(--chip-gray-bg);
+  --color-chip-gray-fg: var(--chip-gray-fg);
+  --color-chip-slate-bg: var(--chip-slate-bg);
+  --color-chip-slate-fg: var(--chip-slate-fg);
+  --color-chip-red-bg: var(--chip-red-bg);
+  --color-chip-red-fg: var(--chip-red-fg);
+  --color-chip-orange-bg: var(--chip-orange-bg);
+  --color-chip-orange-fg: var(--chip-orange-fg);
+  --color-chip-amber-bg: var(--chip-amber-bg);
+  --color-chip-amber-fg: var(--chip-amber-fg);
+  --color-chip-green-bg: var(--chip-green-bg);
+  --color-chip-green-fg: var(--chip-green-fg);
+  --color-chip-teal-bg: var(--chip-teal-bg);
+  --color-chip-teal-fg: var(--chip-teal-fg);
+  --color-chip-blue-bg: var(--chip-blue-bg);
+  --color-chip-blue-fg: var(--chip-blue-fg);
+  --color-chip-indigo-bg: var(--chip-indigo-bg);
+  --color-chip-indigo-fg: var(--chip-indigo-fg);
+  --color-chip-violet-bg: var(--chip-violet-bg);
+  --color-chip-violet-fg: var(--chip-violet-fg);
+  --color-chip-pink-bg: var(--chip-pink-bg);
+  --color-chip-pink-fg: var(--chip-pink-fg);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+
+  --spacing-sidebar: var(--sidebar-width);
+  --spacing-sidebar-collapsed: var(--sidebar-width-collapsed);
+  --spacing-topbar: var(--topbar-height);
+  --spacing-row: var(--row-height);
+  --spacing-header-row: var(--header-height);
+  --container-content: var(--content-max);
+}
+
+/*
+ * Static values, so a plain `@theme`: these keep their `var()` indirection, which is what lets a
+ * component override the scale locally without a cascade fight.
+ */
+@theme {
+  /*
+   * §5.1 asks for a 13–14px base. The root stays at the browser's 16px on purpose: Tailwind's
+   * spacing scale is rem-based, so shrinking the root would silently shrink `p-4` from 16px to
+   * 14px and every shadcn component installed later would arrive slightly wrong.
+   */
+  --text-xs: 0.6875rem; /* 11px — footers, provenance lines, counts */
+  --text-xs--line-height: 1.45;
+  --text-sm: 0.8125rem; /* 13px — table cells, chips, sidebar nav */
+  --text-sm--line-height: 1.45;
+  --text-base: 0.875rem; /* 14px — body copy, form inputs, dialogs */
+  --text-base--line-height: 1.5;
+  --text-lg: 1rem; /* 16px — card titles, section headings */
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.125rem; /* 18px — page titles */
+  --text-xl--line-height: 1.4;
+  --text-2xl: 1.375rem; /* 22px — dashboard greeting, contact name */
+  --text-2xl--line-height: 1.3;
+
+  /*
+   * No web font is loaded, so naming one that is not there would be decoration. The stack is the
+   * host's own UI face, which is also the fastest thing that can render.
+   */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/40;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: var(--text-base);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Proportional digits make a column of numbers shift sideways as it updates. */
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The dense list pages are 13px; the 14px body default is for prose and forms. */
+  table {
+    font-size: var(--text-sm);
+  }
+
+  /*
+   * The accessibility floor, for the elements that are not shadcn components — a table cell, a
+   * bare link, a `tabIndex` on a row. `:focus-visible` is the browser's own judgement of mouse
+   * versus keyboard, so a click never draws it. shadcn's primitives opt out with `outline-none`
+   * and draw their own ring; a utility beats a base rule, so they win without a fight.
+   */
+  :focus-visible {
+    @apply outline-ring outline-2 outline-offset-1;
+  }
+}

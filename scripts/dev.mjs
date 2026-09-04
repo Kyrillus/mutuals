@@ -79,6 +79,32 @@ const has = (cmd) =>
   spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { stdio: 'ignore' }).status ===
   0
 
+/**
+ * pnpm ships with Node but only lands on the PATH once `corepack enable pnpm` has been run, and this
+ * script exists precisely for the person who has not done that yet. Going through corepack directly
+ * is the honest fallback rather than telling them to go and read the README.
+ */
+const PM = has('pnpm') ? ['pnpm', []] : ['corepack', ['pnpm']]
+
+function runPnpm(args, options = {}) {
+  const [command, prefix] = PM
+  const result = spawnSync(command, [...prefix, ...args], {
+    cwd: root,
+    stdio: 'inherit',
+    ...options,
+  })
+  // spawnSync prints nothing at all when the binary itself is missing, so "the error above says why"
+  // would be pointing at an empty space. Say what actually happened instead.
+  if (result.error?.code === 'ENOENT') {
+    die(
+      `Could not run ${command}.`,
+      'Node ships with corepack, which provides pnpm. Enable it once:',
+      dim('  corepack enable pnpm'),
+    )
+  }
+  return result
+}
+
 if (!(await canConnect(host, port))) {
   if (!isLocal) {
     die(
@@ -115,16 +141,17 @@ if (!(await canConnect(host, port))) {
 
 // --- 3. Migrate -------------------------------------------------------------
 
-const migrate = spawnSync('pnpm', ['db:migrate'], { cwd: root, stdio: 'inherit' })
-if (migrate.status !== 0) die('Migrations failed.', 'The error above says why.')
+const migrate = runPnpm(['db:migrate'])
+if (migrate.status !== 0) die('Migrations failed.', 'The migration output above says why.')
 
 // --- 4. Run -----------------------------------------------------------------
 
 console.log(`\n${green('✓')} Database ${bold(dbName)} on ${host}:${port} is migrated.\n`)
 
 const children = []
-const run = (name, args, cwd) => {
-  const child = spawn('pnpm', args, { cwd, stdio: 'inherit' })
+const run = (name, args) => {
+  const [command, prefix] = PM
+  const child = spawn(command, [...prefix, ...args], { cwd: root, stdio: 'inherit' })
   child.on('exit', (code) => {
     if (code !== 0 && code !== null) {
       console.error(`\n${red('✗')} ${name} exited with code ${code}.`)
@@ -141,7 +168,7 @@ function shutdown(code = 0) {
 process.on('SIGINT', () => shutdown(0))
 process.on('SIGTERM', () => shutdown(0))
 
-run('api', ['--filter', '@mutuals/api', 'dev'], root)
+run('api', ['--filter', '@mutuals/api', 'dev'])
 if (existsSync(join(root, 'apps/web/package.json'))) {
-  run('web', ['--filter', '@mutuals/web', 'dev'], root)
+  run('web', ['--filter', '@mutuals/web', 'dev'])
 }

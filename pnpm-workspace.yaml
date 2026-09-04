@@ -20,3 +20,5 @@ minimumReleaseAgeExclude:
   - '@rolldown/binding-linux-ppc64-gnu@1.2.7'
   - '@rolldown/binding-linux-x64-gnu@1.2.7'
   - '@rolldown/binding-openharmony-arm64@1.2.7'
+  - '@types/react-dom@19.2.7'
+  - lucide-react@1.40.0

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mutuals</title>
+    <!--
+      Applied before first paint so a dark-mode user never sees a white flash. It has to be inline
+      and synchronous; a module import would run after the browser has already painted.
+    -->
+    <script>
+      ;(() => {
+        try {
+          const stored = localStorage.getItem('mutuals.theme')
+          const dark =
+            stored === 'dark' ||
+            (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.classList.toggle('dark', dark)
+        } catch {
+          /* private mode, or storage disabled: the light default is fine */
+        }
+      })()
+    </script>
+  </head>
+  <body class="h-full">
+    <div id="root" class="h-full"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -21,7 +21,7 @@ export default tseslint.config(
   // tsconfig, and projectService would fail on them with "not found by the
   // project service" on the very first run.
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'apps/*/scripts/**/*.mjs'],
     languageOptions: {
       globals: globals.node,
       ecmaVersion: 'latest',
