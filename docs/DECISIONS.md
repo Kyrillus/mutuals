@@ -2379,12 +2379,20 @@ is the one hole; a forgotten bypass is caught by the gate rather than by a user.
 end-to-end" is true for the envelope and false for user attribute values. This is a limitation of any
 dynamic-attribute design; it is named rather than implied away. _Falsifier:_ none — it is structural.
 
-**R5 — A 10k-row import is the peak write event and it is the least-tested path.** ~150k facts,
-~150k value rows, ~300k composite-FK parent probes, one `COPY`, one set-based projection, and the
-duplicate probe for every identifier. _Falsifier:_ the Stage-5 acceptance test — import the LinkedIn
-fixture twice and assert zero duplicate values, exactly one live fact per single-valued attribute, and
-a recorded wall-clock in `ARCHITECTURE.md`. If it exceeds ~60 s, the documented fix is dropping and
-rebuilding `av_trgm_idx` around the batch.
+**R5 — A 10k-row import is the peak write event and it is the least-tested path. MEASURED, and the
+prediction was optimistic by about 5x.** _Falsifier, as written:_ the Stage-5 acceptance test — import
+the LinkedIn fixture twice, assert zero duplicate values and exactly one live fact per single-valued
+attribute — **plus a recorded wall-clock in `ARCHITECTURE.md`**. Both halves are now done. Stage 5
+closed the correctness half over 31 rows; Stage 7 closed the wall-clock half over 10,000
+(`apps/api/src/import/import-scale.db.test.ts`, opt-in behind `MUTUALS_IMPORT_PERF=1`).
+
+**The result: 122 s to stage, 176 s to commit — about five minutes, against ~60 s predicted.** All
+10,000 rows land and the batch reports `completed`, so the risk is to patience rather than to
+correctness. The documented remedy — dropping and rebuilding `av_trgm_idx` around the batch — is
+therefore indicated and **has deliberately not been attempted**: the two phases cost roughly the
+same, which does not look like one GIN index, and nobody has profiled where the time goes. Guessing
+at an optimisation with downtime attached would be the same mistake this entry exists to prevent.
+**Still open, with a smaller and better-defined remainder: profile the two phases, then fix.**
 
 **R6 — `mutuals_norm()` depends on the `unaccent` dictionary staying put.** It is a `STABLE` function
 used in `WHERE` clauses and by the projector, never in an index definition, so an `IMMUTABLE`-marking
@@ -3589,3 +3597,104 @@ Three prompts are locked — `ask.filter`, `quick-capture.extract` and `contact.
   exactly like a broken shortcut. Three specs failed against a palette that worked perfectly in a
   browser. The fix is to wait for the shell's own search control first, which is a real signal
   rather than a sleep.
+
+## 19. Stage 7 — polish, and the three things it found
+
+Stage 7 was meant to be a tidy-up: empty states, a keyboard pass, screenshots, a speed pass, a tag.
+Two of those went as expected. The other three entries here are what the tidy-up turned up, and all
+three follow the same pattern — a claim that had never been executed, executed.
+
+### ADR-115 — Every inline editor needs a commit latch, and one of the two did not have it
+
+**Context.** `e2e/specs/api-unreachable.spec.ts` covers what the app does when Fastify is not
+running — the case a laptop meets, and the one every other error test misses because they all assume
+the API answers. It shipped with four tests `test.fixme`, each describing a measured defect.
+
+**What the two write defects turned out to be.** Not what their FIXME comments said. Both failed on
+a **strict-mode violation**: `getByText('Could not save City')` matched **two** toasts. One edit was
+producing two `PATCH` requests.
+
+`AttributeControl` fires `onCommit` on Enter _and_ the wrapper fires it again on the blur that Enter
+causes. `record-cell.tsx` — the table's editor — has had a `done` ref since Stage 3 that makes
+`finish()` idempotent. `attribute-sidebar.tsx` — the detail page's editor, written later — never got
+one. So **every field edited from a contact's page was written twice**, invisibly: the second write
+carries the same value, the optimistic patch hides the round trip, and the fact log records a
+supersession chain with a redundant link in it. It is only visible when the write fails, which is
+precisely why an offline test found it and eighteen months of green tests did not.
+
+**Choice.** The latch moves into the sidebar editor, mirroring the cell's. Both editors now commit
+once and cancel once.
+
+**Consequences.** The rule is worth stating because there will be a third editor: **a commit gesture
+and a blur are the same gesture, and the component that owns the edit session owns the latch.** Not
+the control — `text-controls.tsx` cannot know whether its `onCommit` is the first — and not the
+mutation, which would have to guess whether two identical writes are a double-fire or a real retry.
+
+The other two `fixme`s were smaller and neither was where it said it was: the table's "Try again"
+refetched the schema and not the rows, so it swapped one failure screen for another; and the
+dashboard was **already fixed** — its test addressed the sidebar's "Contacts" link rather than the
+stat card's, because `.first()` picks the earlier one in the DOM. All six tests now pass and no
+`test.fixme` remains in the suite.
+
+### ADR-116 — The e2e package gets DOM types, because half of it runs in a browser
+
+**Context.** `pnpm verify` was reported green at the end of Stage 7's first session. It was not:
+`typecheck` had **six errors**, all in `e2e/specs/` — `document`, `window`, `getComputedStyle`,
+`HTMLElement` — introduced by specs that reach into the page through `page.evaluate`.
+
+**Options.** (1) Rewrite those specs to avoid `page.evaluate`. (2) Give the e2e package DOM types.
+(3) Exclude `e2e` from `typecheck`.
+
+**Choice.** Option 2: `"lib": ["es2023", "dom"]` in `e2e/tsconfig.json`.
+
+**Consequences.** The names are legitimate _in that package and only in that package_ — a Playwright
+spec runs in Node, but the callback handed to `page.evaluate` is serialised and run in the browser,
+where `document` is exactly right. Option 1 would mean rewriting assertions that a locator genuinely
+cannot express (that the type picker is a DOM descendant of the dialog — the whole point of the
+Stage-3 scroll fix). Option 3 is worse than the bug: two gates disagreeing about the same file, with
+the quieter one winning.
+
+The general lesson is the one this repository keeps relearning: **"the gate is green" is a claim, and
+it is checked by running the gate.** A composite script that ends in a pipe reports the exit status
+of the pipe.
+
+### ADR-117 — R5 is measured; the remedy it names is not applied on a guess
+
+**Context.** §13's R5 predicted a 10,000-row import at around 60 s and named its own remedy: "if it
+exceeds ~60 s, the documented fix is dropping and rebuilding `av_trgm_idx` around the batch." Its
+falsifier asked for a recorded wall-clock. Nobody had ever run one.
+
+**The measurement.** 122 s to upload, parse, auto-map, stage and duplicate-check; 176 s to commit
+10,000 contacts and 30,000 facts. **About five minutes — some five times the prediction.** All
+10,000 land and the batch reports `completed`, so what is at risk is patience, not correctness.
+
+**Options.** (1) Apply the documented remedy. (2) Record the measurement, profile before fixing.
+(3) Tighten the importer speculatively.
+
+**Choice.** Option 2.
+
+**Consequences.** The two phases cost roughly the same, and that does not look like one GIN index:
+staging is dominated by 10,000 trigram candidate probes against a table growing underneath them, and
+committing writes 30,000 facts through the projector. Rebuilding an index on that reasoning is a
+guess with downtime attached — the same class of move this register exists to prevent. R5 stays open
+with a smaller remainder: _profile the two phases, then fix._
+
+**The test asserts correctness and prints the clock; it does not assert a latency.** The first
+version failed on R5's 60 s figure, which was wrong twice: ADR-078 rules out latency assertions in as
+many words, and a gate that is permanently red because a prediction was optimistic is not a gate. It
+is opt-in behind `MUTUALS_IMPORT_PERF=1` and skips loudly otherwise, the shape ADR-095 chose for the
+pooler test.
+
+**And the fixture taught the same lesson as ADR-098.** Its first version generated
+`Perf00001 Tester00001`, `Perf00002 Tester00002` … and **half the export was flagged as a duplicate
+of itself** — correctly, because consecutive numbered names are near-identical to a trigram, ADR-099
+put the fuzzy threshold at 0.65, and 500 shared companies supplied the organisation the rule also
+needs. The matcher was right; the fixture was wrong. Uncaught, it would have reported a measurement
+of the _skip_ path as a measurement of the write path — and it would have looked fast.
+
+**F1 is closed while we are here.** Deleting one contact at 10k was **4.0 s** in Stage 1 and is
+**2.07 ms** today, which is migration 0007's four cascade indexes doing exactly what they were added
+for. `MISSING_FK_INDEXES` in the harness is now the empty array, which is the honest end state of a
+signpost. Every read shape was re-measured at the same time and `ARCHITECTURE.md` §4 carries the new
+table; the numbers came out 1.3x to 2x slower than Stage 1's across the board, which is a laptop and
+not a regression — the plan shapes, which are what `pnpm db:check` actually asserts, are unchanged.

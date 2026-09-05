@@ -141,7 +141,11 @@ export function RecordTable({
           variant="outline"
           size="sm"
           onClick={() => {
+            // Both, because both failed. The schema is what this branch is about, but the rows
+            // were being fetched at the same moment and are in the same error state — retrying
+            // only the schema swaps one failure screen for another.
             void definitions.refetch()
+            void records.query.refetch()
           }}
         >
           Try again

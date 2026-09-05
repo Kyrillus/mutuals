@@ -45,8 +45,8 @@ drift away from the app.
 
 ## Status
 
-**Stages 1–6 of 7 are done. Stage 7 — polish and `v0.1.0` — is in progress.** Private use, single
-user, no authentication. Not hosted anywhere.
+**All seven stages are done — `v0.1.0`.** Private use, single user, no authentication. Not hosted
+anywhere.
 
 Working today: contacts, organizations, interactions and follow-ups; user-defined attributes in
 twelve types; saved views; import from LinkedIn, Google Contacts and vCard with duplicate detection
@@ -58,26 +58,28 @@ embeddings, introduction nudges, Gmail and calendar sync, the enrichment crawler
 chat channels, and an MCP server. Every one of them has a named extension point —
 `docs/ARCHITECTURE.md` says where each plugs in.
 
-### What is left in Stage 7
+### What is left
 
-Ordered by what a reader would miss most. The detail, and how to pick each one up, is in
-[`docs/HANDOFF.md`](./docs/HANDOFF.md).
+Phase 1 is complete against §12's definition of done, with **one line of it unticked** and it is not
+a code line:
 
-1. **Four measured defects in how the app behaves when its server is not there.** They are written
-   down as failing-by-design tests in `e2e/specs/api-unreachable.spec.ts`, marked `test.fixme`, each
-   naming what is wrong: a table that shows `502 Bad Gateway` instead of a sentence, stat cards that
-   pulse for ever, a rollback whose message leaks the transport error, and a hung write that nothing
-   ever gives up on. The assertions are the specification — un-`fixme` them as the fixes land.
-2. **The empty-state and keyboard pass is part-done.** Twenty-three new end-to-end tests landed;
-   the sweep across every empty state was not finished.
-3. **The performance numbers in `docs/ARCHITECTURE.md` §4 predate Stages 5 and 6** and describe a
-   schema that has since gained three migrations. `pnpm db:check` re-measures them. The import,
-   merge and nightly-sweep paths have never been measured at 10,000 rows at all.
-4. **No model has ever answered.** The AI layer is fully wired and tested against a fake provider,
-   but `llm_call` has zero rows: nothing has spoken to a real model. The brief's own acceptance test
-   is "type a question into the dashboard and get a sensible answer", and it cannot be ticked until
-   someone sets `OPENROUTER_API_KEY` and tries it.
-5. **The `v0.1.0` tag**, once the four above are settled.
+**No model has ever answered.** The AI layer is fully wired, traced and cost-capped, and every path
+is tested against a fake provider — but `llm_call` has never held a row from a real one. The brief's
+own acceptance test is _"type a question into the dashboard and get a sensible answer"_, and that
+cannot be ticked until someone sets `OPENROUTER_API_KEY` and tries it. Everything else is a
+measurement somebody can repeat.
+
+Two risks stay open, both with a one-line remedy and neither blocking:
+
+- **R5 — the import is slow at scale.** Measured for the first time in Stage 7: a 10,000-row
+  LinkedIn export takes about **five minutes** end to end, against the ~60 s that was predicted. All
+  10,000 rows land correctly, so this is patience rather than data loss, and §6.8's wizard shows a
+  progress bar and resumes after a restart. The documented remedy is deliberately **not** applied —
+  nobody has profiled where the five minutes go, and rebuilding an index on a hunch is a guess with
+  downtime attached (ADR-117).
+- **R7 — pg-boss through a transaction pooler is still unmeasured.** The lifecycle test is written
+  and skips loudly until `POOLER_DATABASE_URL` points at a managed Postgres. A free Supabase project
+  closes it (ADR-095).
 
 ## Running it
 
@@ -139,7 +141,7 @@ what makes the value history, provenance and duplicate detection cheap rather th
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Stack | TypeScript · Postgres 16 + `pgvector` · Fastify · Kysely · React · Tailwind · shadcn/ui · TanStack Table · Vite · Zod                                                                                              |
 | Tests | Vitest (unit + integration against a real database) and Playwright                                                                                                                                                 |
-| Docs  | [`BRIEF.md`](./docs/BRIEF.md) product spec · [`PLAN.md`](./docs/PLAN.md) the plan · [`DECISIONS.md`](./docs/DECISIONS.md) 114 ADRs · [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · [`ERRORS.md`](./docs/ERRORS.md) |
+| Docs  | [`BRIEF.md`](./docs/BRIEF.md) product spec · [`PLAN.md`](./docs/PLAN.md) the plan · [`DECISIONS.md`](./docs/DECISIONS.md) 117 ADRs · [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · [`ERRORS.md`](./docs/ERRORS.md) |
 
 ## Contributing
 

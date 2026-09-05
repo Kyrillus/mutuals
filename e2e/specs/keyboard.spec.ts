@@ -144,7 +144,9 @@ test('a filter can be built, applied and removed without a mouse', async ({ page
   await expect(page).not.toHaveURL(/filter=/)
 })
 
-test('the ⌘K palette opens, moves by arrow key and gives focus back on Escape', async ({ page }) => {
+test('the ⌘K palette opens, moves by arrow key and gives focus back on Escape', async ({
+  page,
+}) => {
   await page.goto('/contacts')
   // A global shortcut is not live until React has mounted, so wait for something React rendered.
   const search = page.locator('main').getByRole('searchbox').first()

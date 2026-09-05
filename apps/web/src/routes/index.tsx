@@ -52,7 +52,13 @@ function DashboardPage() {
       </Section>
 
       <Section title="Key numbers">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/*
+          Named for the test that asserts these cards admit failure. "Contacts" alone is the
+          accessible name of three links on this screen — the sidebar's, this card's and the quick
+          link below — and the first in the DOM is the sidebar's, so a role locator addresses the
+          wrong one. Same reasoning as `ask-answer` and `capture-preview`.
+        */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="key-numbers">
           <StatCard
             label="Contacts"
             value={stats.data?.totalContacts}

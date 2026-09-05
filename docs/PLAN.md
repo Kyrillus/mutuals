@@ -3,7 +3,7 @@
 **Status:** approved. **Stages 1–5 are complete** — see §5 for what Stage 1's definition of done
 actually measured, ADR-087/088 for Stage 2's closing section, ADR-090/091/092 for Stage 3,
 ADR-093/094 for Stage 4, §16 (ADR-095 to ADR-101) for Stage 5, and §17–§18 (ADR-102 to ADR-114)
-for Stage 6. Stage 7 has not started.
+for Stage 6, and §19 (ADR-115 to ADR-117) for Stage 7. Phase 1 is complete.
 **Branch:** `version/claude-v1`. **Source of truth for product decisions:** [`BRIEF.md`](./BRIEF.md).
 **Decision log:** [`DECISIONS.md`](./DECISIONS.md) — 101 ADRs. **Rejected designs:** `adr-archive/`.
 
@@ -63,7 +63,7 @@ a spending cap you control.
 | **4 — Follow-ups + dashboard** ✅    | Reminders with repetition and snoozing, the home screen with its numbers and its "needs your attention" list, and saved table views.                                                        |
 | **5 — Import** ✅                    | Drop in your LinkedIn or Google export, map the columns, fix errors in a grid, and get told which rows look like people you already have. Merging two records by hand.                      |
 | **6 — The AI** ✅                    | Ask your network a question in plain language and see _which search it ran_. Type one sentence after a meeting and confirm what it wants to save. Per-person summaries. The ⌘K command bar. |
-| **7 — Polish**                       | Empty states, keyboard shortcuts, a speed pass at 10,000 rows, screenshots in the README, version 0.1.0.                                                                                    |
+| **7 — Polish** ✅                    | Empty states, keyboard shortcuts, a speed pass at 10,000 rows, screenshots in the README, version 0.1.0.                                                                                    |
 
 I stop at the end of each stage, show you what works and how to try it, and wait.
 
@@ -203,7 +203,7 @@ Each stage ends with green CI, updated docs, a PR and a two-layer report, then s
 | **4 — Follow-ups + dashboard** ✅      | Follow-ups table, recurrence, snooze, dashboard stat cards and attention list, saved views end to end                                                                                                                         | 4    | **Done.** A quarterly follow-up marked done creates the next occurrence. A saved view round-trips through the URL, and searching does not dirty it (ADR-094).                                                                                         |
 | **5 — Import + duplicates + merge** ✅ | The five-step wizard, the four source presets, value mapping, the editable review grid, duplicate detection, merge UI, import batches and provenance markers                                                                  | 8    | **Done.** The LinkedIn fixture imports twice and creates zero duplicates; ADR-098's measured numbers replaced the acceptance test's guessed ones. `PLANNED_OPERATIONS` emptied.                                                                       |
 | **6 — LLM layer** ✅                   | Provider abstraction, Ask the network with "how I searched", quick capture with an editable preview, contact summaries, ⌘K command palette                                                                                    | 6    | **Done.** Every call traced in `llm_call` with its cost; the daily cap is enforced before every billable POST, not once per task (ADR-070). ADR-071's import rule is asserted by a test that runs ESLint.                                             |
-| **7 — Polish and release**             | Empty states, keyboard shortcuts, error handling, the 10k-row performance pass, README with screenshots, `CLAUDE.md` final, tag `v0.1.0`                                                                                      | 4    | §12's end-to-end walkthrough passes on a clean clone.                                                                                                                                                                                                 |
+| **7 — Polish and release** ✅          | Empty states, keyboard shortcuts, error handling, the 10k-row performance pass, README with screenshots, `CLAUDE.md` final, tag `v0.1.0`                                                                                      | 4    | **Done.** 57 e2e specs, no `fixme`. The read path re-measured and the **write** path measured for the first time — R5 is 5x its prediction and now says so (ADR-117). §12 is met but for one line: no real model has answered yet.                    |
 
 ## 6. Test coverage
 

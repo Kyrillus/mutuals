@@ -3,7 +3,15 @@
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "types": ["node"]
+    "types": ["node"],
+    // Playwright specs run in Node, but the callbacks handed to `page.evaluate` run in the
+    // *browser* — so `document`, `window`, `getComputedStyle` and `HTMLElement` are legitimate
+    // names in this package and only in this package. Without DOM here, the moment a spec reaches
+    // into the page for something a locator cannot express, `pnpm typecheck` fails while
+    // `pnpm test:e2e` passes: two gates disagreeing about the same file.
+    //
+    // The base's `lib` is replaced rather than extended, so `es2023` is repeated on purpose.
+    "lib": ["es2023", "dom"]
   },
   "include": ["**/*.ts"]
 }

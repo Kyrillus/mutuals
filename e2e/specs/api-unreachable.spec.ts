@@ -15,10 +15,17 @@
  */
 import { expect, test, type Page } from '../support/fixtures.ts'
 
-// Four of these are `test.fixme`. They are not aspirational: each was measured against a killed
-// Fastify before it was written, and each describes a defect that is still in the app. The agent
-// that found them was stopped before it could fix them, so the assertions stand as the
-// specification. Un-fixme them one at a time as the fixes land -- see docs/HANDOFF.md.
+// All six pass. Four of them were `test.fixme` when this file was written, because they described
+// defects that were measured and not yet fixed; the assertions were left as the specification and
+// the fixes were made against them rather than the other way round. What each one turned out to be
+// is worth knowing, because only one was where its FIXME said it was:
+//
+//   - the table's "Try again" refetched the schema and not the rows, so it swapped one failure
+//     screen for another;
+//   - the dashboard was already fixed -- the test addressed the sidebar's "Contacts" link instead
+//     of the card's, because `.first()` picks the earlier one in the DOM;
+//   - both write tests failed on a *double toast*, which was a double PATCH: the detail sidebar's
+//     editor had no commit latch, so Enter wrote every edit twice. See `attribute-sidebar.tsx`.
 
 /** Everything the SPA asks for, gone. `**` so the versioned prefix is not spelled out twice. */
 const API = '**/api/v1/**'
@@ -49,8 +56,7 @@ async function addContact(page: Page, first: string, last: string): Promise<void
   await expect(dialog).toBeHidden()
 }
 
-// FIXME (Stage 7): the schema-fetch failure still renders the raw status text instead of one sentence.
-test.fixme('a table whose schema cannot be fetched says so, and recovers', async ({ page }) => {
+test('a table whose schema cannot be fetched says so, and recovers', async ({ page }) => {
   await refuseEverything(page)
   await page.goto('/contacts')
 
@@ -87,22 +93,23 @@ test('a page whose loader cannot reach the server offers the way back', async ({
   await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
 })
 
-// FIXME (Stage 7): the dashboard stat cards still pulse for ever rather than admitting they have no numbers.
-test.fixme('the dashboard admits it has no numbers instead of loading for ever', async ({
-  page,
-}) => {
+test('the dashboard admits it has no numbers instead of loading for ever', async ({ page }) => {
   await refuseEverything(page)
   await page.goto('/')
 
   // A skeleton is a promise that a number is coming. With the API gone, every card on this page
   // pulsed indefinitely — the one screen where "still loading" and "never" looked the same.
-  const contacts = page.getByRole('link', { name: /^Contacts/ }).first()
-  await expect(contacts).toContainText('—')
+  //
+  // Scoped to the Key numbers row: `getByRole('link', { name: /^Contacts/ })` also matches the
+  // sidebar's navigation link, and `.first()` picks that one because it is earlier in the DOM. The
+  // assertion is unchanged; it just addresses the card it was always about.
+  const cards = page.getByTestId('key-numbers')
+  await expect(cards.getByRole('link', { name: /^Contacts/ })).toContainText('—')
+  await expect(cards.getByRole('link', { name: /^Overdue/ })).toContainText('—')
   await expect(page.getByText('Could not reach the server').first()).toBeVisible()
 })
 
-// FIXME (Stage 7): the rollback happens, but the toast still carries the transport error rather than a sentence.
-test.fixme('an edit that fails on the way out is rolled back, and says why', async ({ page }) => {
+test('an edit that fails on the way out is rolled back, and says why', async ({ page }) => {
   await addContact(page, 'Grace', 'Hopper')
   await page.getByRole('link', { name: 'Grace Hopper' }).click()
 
@@ -134,8 +141,7 @@ test.fixme('an edit that fails on the way out is rolled back, and says why', asy
   await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
 })
 
-// FIXME (Stage 7): nothing gives up on a hung write yet — there is no client-side deadline.
-test.fixme('a write that hangs is given up on rather than left pending', async ({ page }) => {
+test('a write that hangs is given up on rather than left pending', async ({ page }) => {
   // The client deadline is 20 seconds (`DEFAULT_TIMEOUT_MS`), so this test outlives the default
   // 30-second budget on purpose. It is the only place the whole chain — deadline, rollback, a
   // sentence about waiting — is exercised against a real socket that simply never answers.

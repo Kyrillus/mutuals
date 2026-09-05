@@ -11,7 +11,7 @@
  * optimistic patch, the rollback and the retry toast are one implementation rather than two.
  */
 import type { AttributeDefinitionDto, FieldDescriptor } from '@mutuals/core'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { AttributeCell } from '@/attributes/attribute-cell.tsx'
 import { attributeTypeOf, toDraft, toWriteValue } from '@/attributes/value.ts'
@@ -168,8 +168,26 @@ function SidebarEditor({
     toWriteValue(attributeTypeOf(definition), toDraft(row.attributes[field.slug])),
   )
 
+  /**
+   * One edit, one write.
+   *
+   * Enter commits and then the control loses focus, so `onKeyDown`, the control's own `onCommit`
+   * and this wrapper's `onBlur` all fire for a single keystroke. Without the latch that is **two
+   * PATCHes per edit** — invisible while they succeed, because the second writes the same value
+   * and the optimistic patch hides it, and very visible when they fail, as two identical error
+   * toasts. `record-cell.tsx` has had this latch since Stage 3; this editor never got it.
+   */
+  const done = useRef(false)
+
   function commit() {
+    if (done.current) return
+    done.current = true
     editor.commit(row, field, definition, draft)
+    onDone()
+  }
+
+  function cancel() {
+    done.current = true
     onDone()
   }
 
@@ -182,7 +200,7 @@ function SidebarEditor({
       }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
-          onDone()
+          cancel()
           return
         }
         if (event.key === 'Enter' && !event.shiftKey) {
@@ -198,7 +216,7 @@ function SidebarEditor({
         aria-label={field.label}
         onChange={setDraft}
         onCommit={commit}
-        onCancel={onDone}
+        onCancel={cancel}
       />
     </span>
   )
