@@ -26,12 +26,16 @@ export function TypeSelect({
   onChange,
   id,
   describedBy,
+  labelledBy,
+  required,
   disabled,
 }: {
   value: AttributeType
   onChange: (next: AttributeType) => void
   id?: string
   describedBy?: string | undefined
+  labelledBy?: string | undefined
+  required?: boolean
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
@@ -47,7 +51,13 @@ export function TypeSelect({
         if (!next) setSearch('')
       }}
     >
-      <ComboboxTrigger id={id} disabled={disabled} describedBy={describedBy}>
+      <ComboboxTrigger
+        id={id}
+        disabled={disabled}
+        describedBy={describedBy}
+        labelledBy={labelledBy}
+        required={required}
+      >
         <CurrentIcon className="text-muted-foreground size-4 shrink-0" aria-hidden />
         <span className="truncate">{current.label}</span>
       </ComboboxTrigger>
@@ -82,12 +92,26 @@ export function TypeSelect({
 }
 
 /** The locked version shown when editing: the same row, without the popover. */
-export function TypeDisplay({ value, id }: { value: AttributeType; id?: string }) {
+export function TypeDisplay({
+  value,
+  id,
+  labelledBy,
+}: {
+  value: AttributeType
+  id?: string
+  labelledBy?: string | undefined
+}) {
   const meta = typeMeta(value)
   const Icon = meta.icon
   return (
+    // A `<div>` is not a form control, so nothing associates it with the label either. `group`
+    // plus `aria-labelledby` makes it one readable unit rather than a stray "Short text".
     <div
       id={id}
+      role="group"
+      aria-labelledby={
+        labelledBy === undefined || id === undefined ? undefined : `${labelledBy} ${id}`
+      }
       className="border-input bg-muted/40 text-muted-foreground flex h-9 w-full items-center gap-2 rounded-md border px-3 text-sm"
     >
       <Icon className="size-4 shrink-0" aria-hidden />

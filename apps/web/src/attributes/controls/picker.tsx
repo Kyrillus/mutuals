@@ -110,6 +110,7 @@ export function PickerContent({
               value={search}
               onValueChange={onSearchChange}
               placeholder={searchPlaceholder ?? 'Search…'}
+              aria-label={searchPlaceholder?.replace(/…$/, '') ?? 'Search'}
               className="placeholder:text-muted-foreground h-9 w-full bg-transparent text-sm outline-none"
             />
           </div>

@@ -1,5 +1,6 @@
 import { listResponseSchema, SavedViewSchema } from '@mutuals/core'
 import { createFileRoute, retainSearchParams, useNavigate } from '@tanstack/react-router'
+import { Building2 } from 'lucide-react'
 
 import { api } from '@/lib/api.ts'
 import { qk } from '@/lib/query.ts'
@@ -88,6 +89,7 @@ function OrganizationsPage() {
             primaryColumns={DIALOG_FIELDS}
           />
         }
+        emptyIcon={Building2}
         onTableSettings={() => {
           void navigate({ to: '/settings/organizations/attributes' })
         }}

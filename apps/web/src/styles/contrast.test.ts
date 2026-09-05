@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 // Relative, not `@/`: the root `vitest.config.ts` resolves no alias, and this test has to run
 // under `pnpm test:unit` like every other one.
 import { CHIP_COLORS } from '../ui/chip-colors.ts'
-import { contrastRatio, oklchToSrgb, parseOklch, toHex } from './oklch.ts'
+import { contrastRatio, oklchToSrgb, parseOklch, toHex, type Rgb } from './oklch.ts'
 
 // Read, not imported. Vitest replaces a CSS import with an empty string unless `css` is enabled,
 // so `./globals.css?raw` compiles and then silently asserts nothing at all.
@@ -150,6 +150,127 @@ describe('the palette itself', () => {
 
     expect([...new Set(unresolved)]).toEqual([])
   })
+})
+
+/**
+ * WCAG 2.2 SC 1.4.11: the visual information that identifies a component's *state* needs 3:1, not
+ * 4.5:1 — and the focus ring is the one piece of state a keyboard user has nothing else to go on.
+ *
+ * These are the surfaces a ring is actually drawn against: the page, a card, a popover, a zebra
+ * row, a hovered menu item, the sidebar. `--ring` is checked at full strength here, and the
+ * translucent uses of it are checked against the source below.
+ */
+const RING_SURFACES: readonly string[] = [
+  'background',
+  'card',
+  'popover',
+  'muted',
+  'accent',
+  'secondary',
+  'sidebar',
+]
+
+/** WCAG AA for a component boundary or a state indicator. */
+const MINIMUM_NON_TEXT_RATIO = 3
+
+describe.each([
+  ['light', light],
+  ['dark', dark],
+])('%s theme focus ring', (theme, tokens) => {
+  it.each(RING_SURFACES)(`--ring on --%s clears ${MINIMUM_NON_TEXT_RATIO}:1`, (surface) => {
+    const measured = ratio(tokens, 'ring', surface)
+    expect(
+      measured,
+      `--ring on --${surface} is ${measured.toFixed(2)}:1 in ${theme}`,
+    ).toBeGreaterThanOrEqual(MINIMUM_NON_TEXT_RATIO)
+  })
+
+  it('gives the sidebar its own ring, and that one clears it too', () => {
+    const measured = ratio(tokens, 'sidebar-ring', 'sidebar')
+    expect(
+      measured,
+      `--sidebar-ring is ${measured.toFixed(2)}:1 in ${theme}`,
+    ).toBeGreaterThanOrEqual(MINIMUM_NON_TEXT_RATIO)
+  })
+})
+
+/**
+ * The alpha the components actually ship, read out of the components.
+ *
+ * A token that clears 3:1 proves nothing if every component paints it at half strength: `--ring`
+ * measures 6.17:1 in light, and `ring-ring/50` — shadcn's default, and what this app shipped
+ * through Stage 6 — is **2.22:1** once the browser composites it over the page. That is the whole
+ * focus indicator on a button, a row checkbox and an editable table cell, none of which gain a
+ * solid `border-ring` to carry the job instead.
+ *
+ * So this scans the source for the alpha rather than trusting a number in a comment, and fails
+ * with the ratio it measured.
+ */
+function sourceFiles(directory: string): string[] {
+  const entries = readdirSync(directory, { withFileTypes: true })
+  return entries.flatMap((entry) => {
+    const path = `${directory}/${entry.name}`
+    if (entry.isDirectory()) return sourceFiles(path)
+    return /\.(?:tsx?|css)$/.test(entry.name) ? [path] : []
+  })
+}
+
+const WEB_SOURCE = fileURLToPath(new URL('..', import.meta.url))
+
+/** `focus-visible:ring-ring/80`, `outline-ring/40` — the ring colour used at less than full alpha. */
+const TRANSLUCENT_RING = /\b(?:ring|outline)-ring\/(\d{1,3})\b/g
+
+function over(foreground: Rgb, background: Rgb, alpha: number): Rgb {
+  return [
+    foreground[0] * alpha + background[0] * (1 - alpha),
+    foreground[1] * alpha + background[1] * (1 - alpha),
+    foreground[2] * alpha + background[2] * (1 - alpha),
+  ]
+}
+
+describe('every focus ring the components paint', () => {
+  const found = new Map<number, string[]>()
+  for (const path of sourceFiles(WEB_SOURCE)) {
+    if (path.endsWith('contrast.test.ts')) continue
+    for (const [, alpha] of readFileSync(path, 'utf8').matchAll(TRANSLUCENT_RING)) {
+      if (alpha === undefined) continue
+      const key = Number(alpha)
+      found.set(key, [...(found.get(key) ?? []), path.slice(WEB_SOURCE.length)])
+    }
+  }
+
+  it('scans the source it is supposed to be scanning', () => {
+    // Without this the loop below passes vacuously the day the utility is renamed.
+    expect(sourceFiles(WEB_SOURCE).length).toBeGreaterThan(50)
+    expect(found.size).toBeGreaterThan(0)
+  })
+
+  it.each([...found.keys()].sort((a, b) => a - b))(
+    `stays over ${MINIMUM_NON_TEXT_RATIO}:1 at %i per cent alpha`,
+    (alpha) => {
+      for (const [theme, tokens] of [
+        ['light', light],
+        ['dark', dark],
+      ] as const) {
+        const ringToken = parseOklch(tokens.get('ring') ?? '')
+        expect(ringToken, `--ring is missing in ${theme}`).not.toBeNull()
+        if (ringToken === null) return
+        const ring = oklchToSrgb(ringToken)
+
+        for (const surface of RING_SURFACES) {
+          const surfaceToken = parseOklch(tokens.get(surface) ?? '')
+          if (surfaceToken === null) continue
+          const backdrop = oklchToSrgb(surfaceToken)
+          const measured = contrastRatio(over(ring, backdrop, alpha / 100), backdrop)
+          expect(
+            measured,
+            `ring-ring/${String(alpha)} on --${surface} is ${measured.toFixed(2)}:1 in ${theme}` +
+              ` — used by ${(found.get(alpha) ?? []).join(', ')}`,
+          ).toBeGreaterThanOrEqual(MINIMUM_NON_TEXT_RATIO)
+        }
+      }
+    },
+  )
 })
 
 /**

@@ -32,7 +32,7 @@ export function OptionColorPicker({
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
       <PopoverPrimitive.Trigger
-        className="focus-visible:ring-ring/50 shrink-0 rounded focus-visible:ring-[3px] focus-visible:outline-none"
+        className="focus-visible:ring-ring/80 shrink-0 rounded focus-visible:ring-[3px] focus-visible:outline-none"
         aria-label={`Colour for ${preview}: ${color}`}
       >
         <Chip color={color} className="max-w-28">
@@ -55,7 +55,7 @@ export function OptionColorPicker({
                   onChange(candidate)
                   setOpen(false)
                 }}
-                className="hover:bg-accent focus-visible:ring-ring/50 flex items-center justify-center rounded p-1 focus-visible:ring-[3px] focus-visible:outline-none"
+                className="hover:bg-accent focus-visible:ring-ring/80 flex items-center justify-center rounded p-1 focus-visible:ring-[3px] focus-visible:outline-none"
                 aria-label={candidate}
               >
                 <Chip color={candidate} className="w-full justify-center">

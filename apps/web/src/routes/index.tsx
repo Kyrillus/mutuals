@@ -1,10 +1,10 @@
 import { addDays, civilIn } from '@mutuals/core'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Building2, CalendarClock, ChevronRight, Users } from 'lucide-react'
+import { Building2, CalendarClock, ChevronRight, History, Users } from 'lucide-react'
 
 import { useDisplay } from '@/attributes/display-context.tsx'
 import { formatRelativeDay } from '@/attributes/format.ts'
-import { PageHeader, Section } from '@/components/app-shell/page.tsx'
+import { EmptyState, PageHeader, Section } from '@/components/app-shell/page.tsx'
 import { AskPanel } from '@/features/ask/ask-panel.tsx'
 import { FollowUpList } from '@/features/follow-ups/follow-up-list.tsx'
 import { useFollowUps } from '@/features/follow-ups/use-follow-ups.ts'
@@ -12,6 +12,7 @@ import { useRecordList } from '@/features/records/use-record-list.ts'
 import { useProfile } from '@/hooks/use-profile.ts'
 import { useStats } from '@/hooks/use-stats.ts'
 import { cn } from '@/lib/utils.ts'
+import { Button } from '@/ui/button.tsx'
 import { Skeleton } from '@/ui/skeleton.tsx'
 
 export const Route = createFileRoute('/')({
@@ -38,7 +39,7 @@ function DashboardPage() {
   return (
     <>
       <PageHeader
-        title={`${timeOfDayGreeting()}${profile.data ? `, ${profile.data.firstName}` : ''}`}
+        title={greeting(profile.data?.firstName)}
         description={stats.data ? formatToday(stats.data.today) : undefined}
       />
 
@@ -52,22 +53,31 @@ function DashboardPage() {
 
       <Section title="Key numbers">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Contacts" value={stats.data?.totalContacts} to="/contacts" search={{}} />
+          <StatCard
+            label="Contacts"
+            value={stats.data?.totalContacts}
+            failed={stats.isError}
+            to="/contacts"
+            search={{}}
+          />
           <StatCard
             label="Added in 30 days"
             value={stats.data?.contactsAddedLast30Days}
+            failed={stats.isError}
             to="/contacts"
             search={{ sort: 'created_at:desc' }}
           />
           <StatCard
             label="Due this week"
             value={stats.data?.followUpsDueThisWeek}
+            failed={stats.isError}
             to="/follow-ups"
             search={{}}
           />
           <StatCard
             label="Overdue"
             value={stats.data?.followUpsOverdue}
+            failed={stats.isError}
             to="/follow-ups"
             search={{}}
             emphasis={(stats.data?.followUpsOverdue ?? 0) > 0}
@@ -94,7 +104,11 @@ function DashboardPage() {
                   <span className="text-muted-foreground block text-xs">{link.hint}</span>
                 </span>
                 {count === undefined ? (
-                  <Skeleton className="h-4 w-8" />
+                  stats.isError ? (
+                    <span className="text-muted-foreground text-sm">—</span>
+                  ) : (
+                    <Skeleton className="h-4 w-8" />
+                  )
                 ) : (
                   <span className="text-muted-foreground tabular text-sm">
                     {count.toLocaleString('en-GB')}
@@ -118,16 +132,24 @@ function DashboardPage() {
   )
 }
 
-/** §6.1's stat cards. Each one links to the view it is a count of, per the brief. */
+/**
+ * §6.1's stat cards. Each one links to the view it is a count of, per the brief.
+ *
+ * `failed` exists because a skeleton is a promise that a number is on its way. With the API
+ * stopped, every card on this page used to pulse for ever — the one screen in the product where
+ * "still loading" and "never coming" looked identical.
+ */
 function StatCard({
   label,
   value,
+  failed,
   to,
   search,
   emphasis = false,
 }: {
   label: string
   value: number | undefined
+  failed: boolean
   to: '/contacts' | '/follow-ups'
   search: Record<string, unknown>
   emphasis?: boolean
@@ -140,7 +162,13 @@ function StatCard({
     >
       <span className="text-muted-foreground text-xs">{label}</span>
       {value === undefined ? (
-        <Skeleton className="h-7 w-12" />
+        failed ? (
+          <span className="text-muted-foreground text-2xl font-semibold" title="Not available">
+            —
+          </span>
+        ) : (
+          <Skeleton className="h-7 w-12" />
+        )
       ) : (
         <span className={cn('text-2xl font-semibold tabular', emphasis && 'text-destructive')}>
           {value.toLocaleString('en-GB')}
@@ -194,8 +222,25 @@ function RecentlyInteracted() {
   })
 
   if (recent.query.isPending) return <Skeleton className="h-32 w-full" />
+  // Before the empty state, because a list that failed to load also has no rows — and telling
+  // somebody with 200 contacts that they have none is worse than telling them nothing.
+  if (recent.query.isError) {
+    return <p className="text-destructive text-sm">{recent.query.error.message}</p>
+  }
+  // A contact with nothing logged still appears here, dated "—", so this list is only ever empty
+  // because the workspace has no contacts at all. That is what the message says.
   if (recent.rows.length === 0) {
-    return <p className="text-muted-foreground text-sm">No interactions logged yet.</p>
+    return (
+      <EmptyState
+        icon={History}
+        title="Nobody here yet"
+        description="The ten people you spoke to most recently show up here, newest first. Add someone, then log what you talked about."
+      >
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/contacts">Add your first contact</Link>
+        </Button>
+      </EmptyState>
+    )
   }
 
   return (
@@ -235,6 +280,16 @@ function timeOfDayGreeting(): string {
   if (hour < 12) return 'Good morning'
   if (hour < 18) return 'Good afternoon'
   return 'Good evening'
+}
+
+/**
+ * §6.1 greets by first name — and a fresh workspace has no profile row filled in, which is the
+ * state the very first person to open this app is in. Interpolating an empty string leaves a
+ * trailing comma addressed to nobody, so the comma belongs to the name and not to the greeting.
+ */
+function greeting(firstName: string | undefined): string {
+  const name = firstName?.trim() ?? ''
+  return name === '' ? timeOfDayGreeting() : `${timeOfDayGreeting()}, ${name}`
 }
 
 function formatToday(civilDate: string): string {

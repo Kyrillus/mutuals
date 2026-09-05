@@ -7,7 +7,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { MoreVerticalIcon, UsersIcon } from 'lucide-react'
+import { MoreVerticalIcon, UsersIcon, type LucideIcon } from 'lucide-react'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils.ts'
@@ -83,6 +83,8 @@ export interface DataTableProps {
   readonly filterBar?: ReactNode
   readonly primaryAction?: ReactNode
   readonly emptyAction?: ReactNode
+  /** The icon over the "nothing here yet" message. Defaults to people, which is the common case. */
+  readonly emptyIcon?: LucideIcon
   readonly onTableSettings?: () => void
   /** §6.6's saved-view items for the `⋮` menu. Supplied by the feature, not built here. */
   readonly viewActions?: ReactNode
@@ -135,6 +137,7 @@ export function DataTable({
   filterBar,
   primaryAction,
   emptyAction,
+  emptyIcon,
   onTableSettings,
   viewActions,
   viewPicker,
@@ -328,13 +331,19 @@ export function DataTable({
               )}
 
               {!isLoading && error === null && tableRows.length === 0 && hasView && (
-                <NoMatchesRow columns={columnCount} onClear={onClearView} />
+                <NoMatchesRow
+                  columns={columnCount}
+                  noun={noun}
+                  filterCount={query.filter.length}
+                  search={query.q}
+                  onClear={onClearView}
+                />
               )}
 
               {!isLoading && error === null && tableRows.length === 0 && !hasView && (
                 <TableMessageRow
                   columns={columnCount}
-                  icon={UsersIcon}
+                  icon={emptyIcon ?? UsersIcon}
                   title={`No ${noun}s yet`}
                   description={`Nothing has been added to this table. Create the first ${noun} and the columns below will fill in.`}
                 >
@@ -397,7 +406,7 @@ export function DataTable({
                             pinned && index > 0 && 'border-r',
                             meta?.align === 'end' && 'text-right',
                             editable &&
-                              'focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none',
+                              'focus-visible:ring-ring/80 focus-visible:ring-2 focus-visible:outline-none',
                             pending && 'animate-pulse',
                           )}
                         >

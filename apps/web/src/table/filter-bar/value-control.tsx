@@ -41,7 +41,7 @@ import { fieldOptions } from './sentence.ts'
 export type FilterChange = (next: Filter, options?: { readonly commit?: boolean }) => void
 
 const CONTROL =
-  'h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30'
+  'h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/80 dark:bg-input/30'
 
 const ITEM =
   'flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none select-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground'

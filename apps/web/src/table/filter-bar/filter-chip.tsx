@@ -64,7 +64,7 @@ export function FilterChip({
       <div
         className={cn(
           'bg-background flex h-7 items-center rounded-md border text-xs',
-          open && 'border-ring ring-ring/50 ring-[3px]',
+          open && 'border-ring ring-ring/80 ring-[3px]',
         )}
       >
         <Tooltip>

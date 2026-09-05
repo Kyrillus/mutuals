@@ -53,5 +53,5 @@ test('an organization detail page opens, and its people count links to them', as
   // §6.3: clicking it lands on the contacts table filtered to this organization.
   await people.click()
   await expect(page).toHaveURL(/\/contacts\?.*filter=/)
-  await expect(page.getByText('Nothing matches')).toBeVisible()
+  await expect(page.getByText('No contact matches')).toBeVisible()
 })

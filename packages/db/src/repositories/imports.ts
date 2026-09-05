@@ -293,12 +293,32 @@ export interface RowDuplicateUpdate {
   readonly detail?: JsonValue | null
 }
 
+export interface RowMappingUpdate {
+  readonly rowNumber: number
+  readonly mapped: JsonValue
+  readonly errors: JsonValue
+}
+
+/**
+ * Rows per `UPDATE ... FROM (VALUES ...)`.
+ *
+ * The same 500 `recomputeMetrics` uses, and for the same reason: big enough that the round trip is
+ * not the cost, small enough that 500 x 4 parameters is nowhere near Postgres's 65535 limit.
+ */
+const UPDATE_CHUNK = 500
+
 /**
  * Writes the duplicate verdicts for a whole batch.
  *
  * Both pointers are always set — one to a value and one to `null` — because the `CHECK` allows at
  * most one, and a partial update that sets the new pointer without clearing the old one would fail
  * on any row whose verdict changed kind between two runs of detection.
+ *
+ * One statement per 500 rows, not one per row. `replaceInImportBatch` below already states the
+ * rule — "on a 10k-row import that is 10k round trips for what is one `UPDATE`" — and this is
+ * where it was being broken: measured, a 10,000-row LinkedIn export spent **167 s** in the wizard's
+ * re-derive step, essentially all of it in this loop and the mapping loop beside it. Batched, the
+ * same step is 8.9 s.
  */
 export async function setRowDuplicates(
   exec: Executor,
@@ -306,19 +326,62 @@ export async function setRowDuplicates(
   updates: readonly RowDuplicateUpdate[],
 ): Promise<number> {
   let written = 0
-  for (const update of updates) {
-    const result = await exec
-      .updateTable('import_row')
-      .set({
-        duplicate_of: update.duplicateOf ?? null,
-        duplicate_of_row: update.duplicateOfRow ?? null,
-        duplicate_detail:
-          update.detail === null || update.detail === undefined ? null : json(update.detail),
-      })
-      .where('batch_id', '=', batchId)
-      .where('row_number', '=', update.rowNumber)
-      .executeTakeFirst()
-    written += Number(result.numUpdatedRows)
+  for (let start = 0; start < updates.length; start += UPDATE_CHUNK) {
+    const chunk = updates.slice(start, start + UPDATE_CHUNK)
+    // Every column is cast on every row rather than only on the first. A bare VALUES list takes
+    // its column types from the first row, so a chunk whose first verdict happens to be `null`
+    // types the whole column `text` and the UPDATE fails on the row after it.
+    const rows = chunk.map(
+      (update) => sql`(
+        ${update.rowNumber}::int,
+        ${update.duplicateOf ?? null}::uuid,
+        ${update.duplicateOfRow ?? null}::int,
+        ${update.detail === null || update.detail === undefined ? null : json(update.detail)}::jsonb
+      )`,
+    )
+    const result = await sql<{ row_number: number }>`
+      update import_row r
+         set duplicate_of = v.duplicate_of,
+             duplicate_of_row = v.duplicate_of_row,
+             duplicate_detail = v.detail
+        from (values ${sql.join(rows)}) as v(row_number, duplicate_of, duplicate_of_row, detail)
+       where r.batch_id = ${batchId}::uuid
+         and r.row_number = v.row_number
+      returning r.row_number
+    `.execute(exec)
+    written += result.rows.length
+  }
+  return written
+}
+
+/**
+ * Writes the mapped values and validation errors for a whole batch.
+ *
+ * The batched twin of {@link updateImportRow}, which stays per-row because that is what an edit in
+ * the Review grid is. A re-map is the other thing: it rewrites every row of the file, and doing
+ * that one statement at a time is what made a 10,000-row import take three minutes.
+ */
+export async function setRowMappings(
+  exec: Executor,
+  batchId: Uuid,
+  updates: readonly RowMappingUpdate[],
+): Promise<number> {
+  let written = 0
+  for (let start = 0; start < updates.length; start += UPDATE_CHUNK) {
+    const chunk = updates.slice(start, start + UPDATE_CHUNK)
+    const rows = chunk.map(
+      (update) =>
+        sql`(${update.rowNumber}::int, ${json(update.mapped)}::jsonb, ${json(update.errors)}::jsonb)`,
+    )
+    const result = await sql<{ row_number: number }>`
+      update import_row r
+         set mapped = v.mapped, errors = v.errors
+        from (values ${sql.join(rows)}) as v(row_number, mapped, errors)
+       where r.batch_id = ${batchId}::uuid
+         and r.row_number = v.row_number
+      returning r.row_number
+    `.execute(exec)
+    written += result.rows.length
   }
   return written
 }

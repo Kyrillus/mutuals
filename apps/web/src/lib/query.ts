@@ -14,7 +14,7 @@
  */
 import { QueryClient } from '@tanstack/react-query'
 
-import { ApiError } from './api.ts'
+import { ApiError, TimeoutError } from './api.ts'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,6 +26,9 @@ export const queryClient = new QueryClient({
         // A 4xx is the server saying no. Repeating the request cannot change the answer, and the
         // §5.2 error toast should fire immediately rather than three seconds later.
         if (error instanceof ApiError && error.status < 500) return false
+        // A timed-out request already cost its full deadline. Two more would make the reader wait
+        // a minute before the error row admits that anything is wrong.
+        if (error instanceof TimeoutError) return false
         return failureCount < 2
       },
       refetchOnWindowFocus: false,

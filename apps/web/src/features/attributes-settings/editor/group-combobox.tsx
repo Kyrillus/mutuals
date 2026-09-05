@@ -24,6 +24,7 @@ export function GroupCombobox({
   onChange,
   id,
   describedBy,
+  labelledBy,
 }: {
   value: string
   /** Every group already used by an attribute of this object type. */
@@ -31,6 +32,7 @@ export function GroupCombobox({
   onChange: (next: string) => void
   id?: string
   describedBy?: string | undefined
+  labelledBy?: string | undefined
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -56,6 +58,7 @@ export function GroupCombobox({
       <ComboboxTrigger
         id={id}
         describedBy={describedBy}
+        labelledBy={labelledBy}
         empty={value === ''}
         placeholder="No group"
       >

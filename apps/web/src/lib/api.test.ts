@@ -2,7 +2,7 @@ import { ProfileSchema, problemType } from '@mutuals/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { api, ApiError, API_BASE } from './api.ts'
+import { api, ApiError, API_BASE, NetworkError, TimeoutError } from './api.ts'
 
 type FetchArgs = { url: string; init: RequestInit | undefined }
 
@@ -104,13 +104,13 @@ describe('api', () => {
   })
 
   it('survives a failure whose body is not JSON at all', async () => {
-    stubFetch(() => new Response('<html>502 Bad Gateway</html>', { status: 502 }))
+    stubFetch(() => new Response('<html>500 Internal Server Error</html>', { status: 500 }))
 
     const error = await api.get(ProfileSchema, '/profile').catch((thrown: unknown) => thrown)
 
     expect(error).toBeInstanceOf(ApiError)
     const apiError = error as ApiError
-    expect(apiError.status).toBe(502)
+    expect(apiError.status).toBe(500)
     expect(apiError.problem).toBeNull()
     expect(apiError.errors).toHaveLength(0)
   })
@@ -119,5 +119,104 @@ describe('api', () => {
     stubFetch(() => json({ firstName: 'Simon' }))
 
     await expect(api.get(ProfileSchema, '/profile')).rejects.toThrow()
+  })
+})
+
+/**
+ * The three ways a request fails without ever producing a status. They are separated here because
+ * the UI has to tell them apart: an unreachable server is a sentence about the server, a deadline
+ * is a sentence about waiting, and a cancelled request is not a failure at all.
+ */
+describe('a request that never reaches a status', () => {
+  it('translates a rejected fetch into a sentence about the server', async () => {
+    // What Chrome throws with nothing listening on the port.
+    vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')))
+
+    const error = await api.get(ProfileSchema, '/profile').catch((thrown: unknown) => thrown)
+
+    expect(error).toBeInstanceOf(NetworkError)
+    expect((error as NetworkError).message).toMatch(/could not reach the server/i)
+    // The engine's own words are kept for the console, and kept out of the user's way.
+    expect((error as NetworkError).cause).toBeInstanceOf(TypeError)
+  })
+
+  it('reads a bare 502 as the proxy saying the API is not there', async () => {
+    // Exactly what `vite preview` answers with Fastify stopped — measured, then written down.
+    stubFetch(() => new Response('<html>502 Bad Gateway</html>', { status: 502 }))
+
+    const error = await api.get(ProfileSchema, '/profile').catch((thrown: unknown) => thrown)
+
+    expect(error).toBeInstanceOf(NetworkError)
+    expect((error as NetworkError).status).toBe(502)
+    expect((error as NetworkError).message).toMatch(/could not reach the server/i)
+  })
+
+  it('still trusts a 503 that carries a problem document, because ours do', async () => {
+    // §4.8 answers 503 `llm_disabled` when there is no API key, and that is the API talking.
+    stubFetch(() =>
+      json(
+        {
+          type: problemType('llm_disabled'),
+          title: 'The AI features are switched off',
+          status: 503,
+          detail: 'Set OPENROUTER_API_KEY to switch them on.',
+          instance: '/api/v1/ask',
+        },
+        503,
+        'application/problem+json',
+      ),
+    )
+
+    const error = await api.post(z.unknown(), '/ask', {}).catch((thrown: unknown) => thrown)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).message).toBe('Set OPENROUTER_API_KEY to switch them on.')
+  })
+
+  it('gives up on a socket that is open and silent', async () => {
+    // Never resolves, and never rejects on its own: the deadline is the only thing that ends it.
+    vi.stubGlobal(
+      'fetch',
+      (_input: string | URL, init?: RequestInit) =>
+        new Promise((_resolve, reject: (reason: Error) => void) => {
+          init?.signal?.addEventListener('abort', () => {
+            const reason: unknown = init.signal?.reason
+            reject(reason instanceof Error ? reason : new Error('aborted'))
+          })
+        }),
+    )
+
+    const error = await api
+      .get(ProfileSchema, '/profile', { timeoutMs: 20 })
+      .catch((thrown: unknown) => thrown)
+
+    expect(error).toBeInstanceOf(TimeoutError)
+    expect((error as TimeoutError).timeoutMs).toBe(20)
+  })
+
+  it("passes the caller's own cancellation through untranslated", async () => {
+    // React Query recognises its own abort by identity; wrapping it would turn every navigation
+    // away from a loading page into an error toast.
+    vi.stubGlobal(
+      'fetch',
+      (_input: string | URL, init?: RequestInit) =>
+        new Promise((_resolve, reject: (reason: Error) => void) => {
+          init?.signal?.addEventListener('abort', () => {
+            const reason: unknown = init.signal?.reason
+            reject(reason instanceof Error ? reason : new Error('aborted'))
+          })
+        }),
+    )
+
+    const controller = new AbortController()
+    const pending = api
+      .get(ProfileSchema, '/profile', { signal: controller.signal })
+      .catch((thrown: unknown) => thrown)
+    controller.abort(new DOMException('The user navigated away', 'AbortError'))
+
+    const error = await pending
+    expect(error).not.toBeInstanceOf(NetworkError)
+    expect(error).not.toBeInstanceOf(TimeoutError)
+    expect((error as Error).name).toBe('AbortError')
   })
 })

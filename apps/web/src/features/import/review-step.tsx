@@ -159,8 +159,19 @@ export function ReviewStep({
             ))}
           </tbody>
         </table>
+        {/*
+          The three tabs fail differently, and on this screen "nothing here" is usually good news:
+          an empty Error rows tab means the file is clean, and saying so is worth more than a
+          shrug. Only the All rows tab is a problem, and then the file itself is the problem.
+        */}
         {rows.length === 0 ? (
-          <p className="text-muted-foreground p-6 text-center text-sm">Nothing here.</p>
+          <p className="text-muted-foreground p-6 text-center text-sm">
+            {tab === 'errors'
+              ? 'No row has an error. Every row in this file is ready to import.'
+              : tab === 'duplicates'
+                ? 'No row looks like anyone you already have, or like another row in this file.'
+                : 'This file has no rows to import. Go back and choose another file, or another sheet.'}
+          </p>
         ) : null}
       </div>
     </div>

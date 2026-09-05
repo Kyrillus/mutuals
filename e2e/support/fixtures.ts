@@ -22,3 +22,5 @@ export const test = base.extend<{ freshDatabase: void }>({
 })
 
 export { expect } from '@playwright/test'
+/** Re-exported so a spec's own helper can be typed without a second import of the base module. */
+export type { Page } from '@playwright/test'

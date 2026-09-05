@@ -92,14 +92,14 @@ export function OptionsEditor({
               }}
               className={cn(
                 'flex items-center gap-2 rounded-md',
-                over === index && dragging !== null && dragging !== index && 'ring-ring/50 ring-2',
+                over === index && dragging !== null && dragging !== index && 'ring-ring/80 ring-2',
                 dragging === index && 'opacity-50',
               )}
             >
               <button
                 type="button"
                 aria-label={`Move ${option.label === '' ? 'option' : option.label}`}
-                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 h-8 shrink-0 cursor-grab rounded px-0.5 focus-visible:ring-[3px] focus-visible:outline-none"
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/80 h-8 shrink-0 cursor-grab rounded px-0.5 focus-visible:ring-[3px] focus-visible:outline-none"
                 onPointerDown={() => {
                   setDragging(index)
                 }}

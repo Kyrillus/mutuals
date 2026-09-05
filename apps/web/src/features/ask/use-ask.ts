@@ -9,10 +9,12 @@
 import { AskResponseSchema, type AskRequest, type AskResponse } from '@mutuals/core'
 import { useMutation, type UseMutationResult } from '@tanstack/react-query'
 
-import { api } from '@/lib/api.ts'
+import { SLOW_TIMEOUT_MS, api } from '@/lib/api.ts'
 
 export function useAsk(): UseMutationResult<AskResponse, Error, AskRequest> {
   return useMutation({
-    mutationFn: (body: AskRequest) => api.post(AskResponseSchema, '/ask', body),
+    // ADR-065 gives the model 45 seconds of its own, so the browser must outwait it.
+    mutationFn: (body: AskRequest) =>
+      api.post(AskResponseSchema, '/ask', body, { timeoutMs: SLOW_TIMEOUT_MS }),
   })
 }

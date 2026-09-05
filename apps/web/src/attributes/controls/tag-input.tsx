@@ -71,7 +71,7 @@ export function TagInputControl({
           className={cn(
             CONTROL_SURFACE,
             'flex min-h-8 flex-wrap items-center gap-1 px-1.5 py-1',
-            'focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]',
+            'focus-within:border-ring focus-within:ring-ring/80 focus-within:ring-[3px]',
             className,
           )}
           onClick={() => {

@@ -13,9 +13,10 @@
  */
 import { Command as CommandPrimitive } from 'cmdk'
 import { Dialog as DialogPrimitive } from 'radix-ui'
-import type { ComponentProps, ReactNode } from 'react'
+import { useState, type ComponentProps, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils.ts'
+import { useRestoreFocusOnClose } from '@/ui/dialog.tsx'
 
 export function CommandDialog({
   open,
@@ -29,12 +30,19 @@ export function CommandDialog({
   label: string
   children: ReactNode
 }) {
+  // The palette is opened from anywhere by ⌘K, so there is no trigger for Radix to hand focus back
+  // to — see `useRestoreFocusOnClose`. Without it, Escape left focus on `<body>`.
+  const [container, setContainer] = useState<HTMLElement | null>(null)
+  const restoreFocus = useRestoreFocusOnClose(container)
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50" />
         <DialogPrimitive.Content
+          ref={setContainer}
           aria-label={label}
+          onCloseAutoFocus={restoreFocus}
           className={cn(
             'bg-popover text-popover-foreground fixed top-[20%] left-1/2 z-50 w-full max-w-xl -translate-x-1/2 rounded-lg border shadow-lg',
             'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',

@@ -92,7 +92,7 @@ export function FilterEditor({
       </button>
 
       <select
-        className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+        className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/80 dark:bg-input/30"
         aria-label="Operator"
         value={draft.op}
         onChange={(event) => {

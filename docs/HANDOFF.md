@@ -12,7 +12,8 @@ talked to.
 
 ## Where the work stopped
 
-**Stages 1 to 6 are done.** Everything lives in
+**Stages 1 to 6 are done. Stage 7 is part-done and paused mid-flight** — see "Stage 7, where it
+actually stands" below before doing anything else. Everything lives in
 [PR #1](https://github.com/Kyrillus/mutuals/pull/1), which grew to cover them together and has been
 retitled at each stage — see ADR-089 for why, and why that was Simon's call rather than a default.
 
@@ -42,6 +43,61 @@ over one you just measured.
 `site/`, which this branch never touches. Merging PR #1 today would delete the old German Next.js
 prototype from `main`, and Simon's instruction was to leave it there. The only real conflict is two
 lines of `.gitignore`. Simon has said explicitly: **do nothing about it.** Revisit at Stage 7.
+
+## Stage 7, where it actually stands
+
+Paused deliberately, not abandoned: Simon's 5-hour limit was about to run out and stopping at a green
+gate was better than stopping anywhere. `pnpm verify` and `pnpm verify:e2e` both pass right now —
+**53 e2e specs pass and 4 are `test.fixme`** — so the tree is safe to build on.
+
+**Done in Stage 7 so far**
+
+- `docs/screenshots/` and `pnpm screenshots`, which regenerates all five against a seeded database
+  rather than leaving pictures to rot. The README embeds them.
+- The README rewritten for release: what it looks like, how to run it, how to import a LinkedIn
+  export, how to turn the AI on, and two rules for contributors.
+- An accessibility and keyboard pass across the attribute editor's controls (the Type and Group
+  labels that were owed since Stage 3 are done), plus **23 new e2e specs**, taking the suite from 30
+  to 57.
+
+**The four defects, which are the most valuable thing here**
+
+`e2e/specs/api-unreachable.spec.ts` covers what the app does when Fastify is not running — the case
+Simon will actually meet, and the one every existing error test misses, because those all assume the
+API answers. The agent that wrote it **measured each failure before simulating it**, and its file
+header records what the app really showed. Four tests are `test.fixme` because the defects are still
+there:
+
+| Test                                                                 | The defect                                                                                                                |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `a table whose schema cannot be fetched says so, and recovers`       | Renders `The field definitions could not be loaded: 502 Bad Gateway` — a raw status string, on screen, to a non-developer |
+| `the dashboard admits it has no numbers instead of loading for ever` | Stat cards pulse indefinitely; there is no failure state                                                                  |
+| `an edit that fails on the way out is rolled back, and says why`     | The rollback works; the toast still carries the transport error rather than a sentence                                    |
+| `a write that hangs is given up on rather than left pending`         | Nothing gives up. There is no client-side deadline on a write                                                             |
+
+Note the shape of these: the app handles a server that _answers badly_ well, and a server that is
+_absent_ poorly. Fix them one at a time and remove the `fixme` as each lands.
+
+**Not started**
+
+- The sweep across every empty state (§5.2 asks for one per table, per filtered-to-nothing view, per
+  record with no children). The seeded database hides most of them, so they have to be created.
+- The speed pass. `docs/ARCHITECTURE.md` §4's numbers are from Stage 1 and describe a schema three
+  migrations ago; `pnpm db:check` re-measures them in about 80 seconds. **The import, merge and
+  nightly-sweep paths have never been measured at 10,000 rows** — §13's R5 predicts 8–20 s for the
+  import and nobody has checked.
+- `CLAUDE.md`'s closing pass and the `v0.1.0` tag.
+
+**The two things only Simon can settle**
+
+1. **The OpenRouter key.** `llm_call` has zero rows: no model has ever answered. The wiring is
+   tested against a fake provider and the daily cap is enforced, but §12's acceptance test — "type a
+   question into the dashboard and get a sensible answer" — cannot be ticked until a real key is set
+   and someone tries it. This is the one gap between "the tests pass" and "the product works".
+2. **`main`.** This is the stage where the merge question is due. `main` carries the old German
+   prototype and a `site/` directory this branch has never touched; the only real conflict is two
+   lines of `.gitignore`. His standing instruction has been "do nothing about it" — bring him the
+   options, do not pick one.
 
 ## What Stage 6 changed that reaches beyond Stage 6
 

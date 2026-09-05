@@ -15,6 +15,7 @@ import { prettyUrl } from '@/attributes/format.ts'
 import { InteractionTimeline } from '@/features/interactions/interaction-timeline.tsx'
 import { AttributeSidebar } from '@/features/records/detail/attribute-sidebar.tsx'
 import { MergeDialog } from '@/features/merge/merge-dialog.tsx'
+import { organizationRelationSlug, PeopleTab } from '@/features/records/detail/people-tab.tsx'
 import { RecordHeader } from '@/features/records/detail/record-header.tsx'
 import { useAttributeDefinitions } from '@/features/records/use-attribute-definitions.ts'
 import { useOrganization } from '@/features/records/use-record.ts'
@@ -58,6 +59,11 @@ function OrganizationDetailPage() {
     [definitions.data],
   )
 
+  // The roster and the header's "N people" link filter contacts by the same user-defined relation,
+  // so the slug is resolved once from the contact schema rather than spelled out twice.
+  const contactDefinitions = useAttributeDefinitions('contact')
+  const relationSlug = organizationRelationSlug(contactDefinitions.data)
+
   if (record.isPending || definitions.isPending) {
     return <Skeleton className="h-64 w-full" />
   }
@@ -95,15 +101,19 @@ function OrganizationDetailPage() {
                   </a>
                 )}
                 {/* Clicks through to the contacts table filtered to this organization (§6.3). */}
-                <Link
-                  to="/contacts"
-                  search={{
-                    filter: [{ field: 'organization', op: 'has_any_of', values: [id] }],
-                  }}
-                  className="hover:underline"
-                >
-                  {people === 1 ? '1 person' : `${String(people)} people`}
-                </Link>
+                {relationSlug === null ? (
+                  <span>{people === 1 ? '1 person' : `${String(people)} people`}</span>
+                ) : (
+                  <Link
+                    to="/contacts"
+                    search={{
+                      filter: [{ field: relationSlug, op: 'has_any_of', values: [id] }],
+                    }}
+                    className="hover:underline"
+                  >
+                    {people === 1 ? '1 person' : `${String(people)} people`}
+                  </Link>
+                )}
               </>
             }
           />
@@ -111,11 +121,16 @@ function OrganizationDetailPage() {
           <Tabs defaultValue="overview" className="mt-6">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="people">People</TabsTrigger>
               <TabsTrigger value="activities">Activities</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
               <InteractionTimeline organizationId={id} limit={3} />
+            </TabsContent>
+
+            <TabsContent value="people">
+              <PeopleTab organizationId={id} relationSlug={relationSlug} />
             </TabsContent>
 
             <TabsContent value="activities">

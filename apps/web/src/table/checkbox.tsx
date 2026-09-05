@@ -39,7 +39,7 @@ export function Checkbox({
       onChange={onCheckedChange}
       className={cn(
         'border-input text-primary accent-primary size-3.5 cursor-pointer rounded-[3px] border align-middle',
-        'focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none',
+        'focus-visible:ring-ring/80 focus-visible:ring-[3px] focus-visible:outline-none',
         className,
       )}
     />

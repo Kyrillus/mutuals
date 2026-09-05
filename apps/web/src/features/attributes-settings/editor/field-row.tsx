@@ -11,28 +11,60 @@ import { useId, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils.ts'
 
+export interface FieldRowIds {
+  /** For the control itself. */
+  readonly id: string
+  /**
+   * For a control that a `<label for>` cannot name.
+   *
+   * A `<label for>` names form controls; the accessible name of a **button** is computed from
+   * `aria-labelledby`, `aria-label` and then its own contents. The Type and Group pickers are
+   * Radix popover triggers — buttons — so `<label for>` alone leaves their name at the mercy of
+   * whichever browser happens to fall back to the related element. Pointing `aria-labelledby` at
+   * this id and at the control's own id names them "Type Short text": the field, then its value,
+   * which is what a native `<select>` announces.
+   */
+  readonly labelId: string
+  readonly describedBy: string | undefined
+  /** The asterisk is decoration; this is the machine-readable half of it. */
+  readonly required: boolean
+}
+
 export interface FieldRowProps {
   readonly label: string
   readonly required?: boolean
   readonly help?: ReactNode
   readonly error?: string | undefined
-  /** Receives the id to hang on the control and the id to point `aria-describedby` at. */
-  readonly children: (ids: { id: string; describedBy: string | undefined }) => ReactNode
+  /** Receives the ids to hang on the control and the id to point `aria-describedby` at. */
+  readonly children: (ids: FieldRowIds) => ReactNode
 }
 
 export function FieldRow({ label, required, help, error, children }: FieldRowProps) {
   const id = useId()
+  const labelId = `${id}-label`
   const messageId = `${id}-message`
   const hasMessage = error !== undefined || help !== undefined
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
+      <label id={labelId} htmlFor={id} className="text-sm font-medium">
         {label}
-        {required === true && <span className="text-destructive"> *</span>}
+        {/* Hidden from the accessible name: "Title star" is not the name of the field, and
+            `aria-required` on the control says the same thing in a way software can act on. */}
+        {required === true && (
+          <span className="text-destructive" aria-hidden>
+            {' '}
+            *
+          </span>
+        )}
       </label>
 
-      {children({ id, describedBy: hasMessage ? messageId : undefined })}
+      {children({
+        id,
+        labelId,
+        describedBy: hasMessage ? messageId : undefined,
+        required: required === true,
+      })}
 
       {hasMessage && (
         <p

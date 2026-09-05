@@ -341,4 +341,32 @@ describe('probeDuplicates', () => {
     expect(results[0]?.pool.identifierHits).toHaveLength(1)
     expect(results[1]?.pool.nameCandidates).not.toHaveLength(0)
   })
+
+  /**
+   * §6.8 promises a 10,000-row import, and the identifier probe is the one statement that grows
+   * with the file. It used to grow as one `OR` term per identifier, and a 10k LinkedIn export
+   * carries ~16,000 of them: Kysely's query compiler recurses once per `OR` node, so the request
+   * died with `RangeError: Maximum call stack size exceeded` before Postgres ever saw it — and the
+   * sizes that did compile were superlinear and, worse, not cancellable.
+   *
+   * The number is deliberately the real one rather than a smaller one that "should be enough": the
+   * failure is a stack depth, so a test at 1,000 would pass against the very code this exists to
+   * keep out. It costs about a second because the batch is now two array parameters.
+   */
+  it('probes a whole 10,000-row import in one statement', async () => {
+    await contact({ firstName: 'Anna', lastName: 'Berger', email: 'anna@northstar.example' })
+
+    const probes = Array.from({ length: 10_000 }, (_unused, index) =>
+      probe({
+        displayName: `Person ${index}`,
+        identifiers: [
+          { kind: 'email', value: `person.${index}@example.com` },
+          { kind: 'linkedin_url', value: `in/person-${index}` },
+        ],
+      }),
+    )
+    const results = await probeDuplicates(testDb(), probes)
+    expect(results).toHaveLength(10_000)
+    expect(results.every((one) => one.pool.identifierHits.length === 0)).toBe(true)
+  })
 })

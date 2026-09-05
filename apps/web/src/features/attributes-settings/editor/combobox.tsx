@@ -25,6 +25,8 @@ export function ComboboxTrigger({
   id,
   disabled,
   describedBy,
+  labelledBy,
+  required,
   invalid,
 }: {
   children?: ReactNode
@@ -33,6 +35,13 @@ export function ComboboxTrigger({
   id?: string
   disabled?: boolean
   describedBy?: string | undefined
+  /**
+   * The id of the visible label. Combined with this trigger's own id so the accessible name is
+   * "Type Short text" — the field and its current value, the way a `<select>` announces itself.
+   * A bare `<label for>` does not name a button (see `FieldRowIds.labelId`).
+   */
+  labelledBy?: string | undefined
+  required?: boolean
   invalid?: boolean
 }) {
   return (
@@ -40,11 +49,15 @@ export function ComboboxTrigger({
       id={id}
       disabled={disabled}
       aria-describedby={describedBy}
+      aria-labelledby={
+        labelledBy === undefined || id === undefined ? undefined : `${labelledBy} ${id}`
+      }
+      aria-required={required}
       aria-invalid={invalid}
       className={cn(
         'flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-input bg-transparent',
         'px-3 text-left text-sm shadow-xs transition-[color,box-shadow] outline-none',
-        'dark:bg-input/30 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        'dark:bg-input/30 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/80',
         'aria-invalid:border-destructive aria-invalid:ring-destructive/20',
         'dark:aria-invalid:ring-destructive/40',
         'disabled:cursor-not-allowed disabled:opacity-60',
@@ -103,6 +116,9 @@ export function ComboboxContent({
               value={search}
               onValueChange={onSearchChange}
               placeholder={searchPlaceholder ?? 'Search…'}
+              // A placeholder is a hint, not a name. Chromium falls back to it and other engines
+              // do not, so the search box in a popover is nameless exactly where it matters.
+              aria-label={searchPlaceholder?.replace(/…$/, '') ?? 'Search'}
               className="placeholder:text-muted-foreground h-9 w-full bg-transparent text-sm outline-none"
             />
           </div>

@@ -1,14 +1,17 @@
 import type { FieldDescriptor } from '@mutuals/core'
+import { AlertTriangle, type LucideIcon } from 'lucide-react'
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 
 import { isEditable } from '@/attributes/attribute-input.tsx'
 import { DisplayProvider } from '@/attributes/display-context.tsx'
+import { EmptyState } from '@/components/app-shell/page.tsx'
 import { useListQuery } from '@/hooks/use-list-query.ts'
 import { csvFileName, downloadCsv, recordsToCsv } from '@/table/csv.ts'
 import { DataTable } from '@/table/data-table.tsx'
 import { labelSlug, recordFieldResolver } from '@/table/fields.ts'
 import { FilterBar } from '@/table/filter-bar/filter-bar.tsx'
 import type { RecordRow } from '@/table/record-row.ts'
+import { Button } from '@/ui/button.tsx'
 import { Skeleton } from '@/ui/skeleton.tsx'
 
 import { RecordCell, RecordEditorCell, type DefinitionIndex } from './record-cell.tsx'
@@ -30,6 +33,7 @@ export interface RecordTableProps {
   readonly defaultColumns?: readonly string[]
   readonly primaryAction?: ReactNode
   readonly emptyAction?: ReactNode
+  readonly emptyIcon?: LucideIcon
   readonly onTableSettings?: () => void
 }
 
@@ -45,6 +49,7 @@ export function RecordTable({
   defaultColumns,
   primaryAction,
   emptyAction,
+  emptyIcon,
   onTableSettings,
 }: RecordTableProps) {
   const definitions = useAttributeDefinitions(objectType)
@@ -123,10 +128,25 @@ export function RecordTable({
 
   if (definitions.isPending) return <TableSkeleton />
   if (definitions.error !== null) {
+    // Without the schema there is no table at all — not even a header — so this is the whole page
+    // and it needs the shape of a page: what failed, why, and the way out. A grey sentence where a
+    // table should be reads as an app that has quietly given up.
     return (
-      <p className="text-destructive text-sm">
-        The field definitions could not be loaded: {definitions.error.message}
-      </p>
+      <EmptyState
+        icon={AlertTriangle}
+        title="This table could not be loaded"
+        description={`${definitions.error.message} The columns come from the field definitions, so nothing can be shown until they arrive.`}
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            void definitions.refetch()
+          }}
+        >
+          Try again
+        </Button>
+      </EmptyState>
     )
   }
 
@@ -176,6 +196,7 @@ export function RecordTable({
         filterBar={<FilterBar fields={fields} filter={query.filter} onChange={list.setFilters} />}
         primaryAction={primaryAction}
         emptyAction={emptyAction}
+        emptyIcon={emptyIcon}
         onTableSettings={onTableSettings}
         viewPicker={<ViewPicker state={viewState} />}
         viewActions={

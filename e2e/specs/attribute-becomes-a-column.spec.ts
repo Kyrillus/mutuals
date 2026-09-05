@@ -41,7 +41,8 @@ test('a field invented in Settings becomes a column you can filter by', async ({
   // --- and you can filter by it -----------------------------------------------------------------
 
   // With no contacts at all the table already shows an empty state, and *which* one it shows is the
-  // assertion: "No contacts yet" means the filter did nothing, "Nothing matches" means it applied.
+  // assertion: "No contacts yet" means the filter did nothing, "No contact matches" means it
+  // applied.
   await expect(page.getByText('No contacts yet')).toBeVisible()
 
   await page.getByRole('button', { name: 'Add filter' }).click()
@@ -54,5 +55,5 @@ test('a field invented in Settings becomes a column you can filter by', async ({
   await page.getByRole('button', { name: 'Done' }).click()
 
   await expect(page).toHaveURL(/filter=/)
-  await expect(page.getByText('Nothing matches')).toBeVisible()
+  await expect(page.getByText('No contact matches')).toBeVisible()
 })

@@ -16,7 +16,7 @@ import {
 } from '@mutuals/core'
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query'
 
-import { api } from '@/lib/api.ts'
+import { SLOW_TIMEOUT_MS, api } from '@/lib/api.ts'
 import { qk } from '@/lib/query.ts'
 
 export function useQuickCapture(): UseMutationResult<
@@ -26,7 +26,9 @@ export function useQuickCapture(): UseMutationResult<
 > {
   return useMutation({
     mutationFn: (body: { text: string }) =>
-      api.post(QuickCaptureResponseSchema, '/quick-capture', body),
+      api.post(QuickCaptureResponseSchema, '/quick-capture', body, {
+        timeoutMs: SLOW_TIMEOUT_MS,
+      }),
   })
 }
 

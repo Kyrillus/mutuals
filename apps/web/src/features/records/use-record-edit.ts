@@ -11,6 +11,13 @@
  *     `${recordId}:${slug}` holds a rising sequence number, and `onSuccess` is a **no-op when a
  *     newer write for the same cell is in flight** — otherwise two fast edits can commit out of
  *     order and the older response overwrites the newer value.
+ *  4. **The snapshot belongs to the cell, not to the write.** Found in Stage 7 by killing the
+ *     server mid-edit: two writes for one cell meant the second snapshotted the *first one's
+ *     optimistic value*, so the rollback restored the value that had just failed to save and the
+ *     cell kept a number the database had never seen. The first write to touch an idle cell takes
+ *     the snapshot; every later one shares it, and it is thrown away when the last of them settles.
+ *     A failure while a newer write is still in flight does not roll back at all — that write will
+ *     either commit its own value or roll back to the same original.
  *  3. **Retry calls `.mutate` on the mutation object**, reached through a ref, because the object
  *     does not exist yet while its own options are being constructed.
  */
@@ -37,6 +44,9 @@ import { recordEndpoint, type RecordObjectType } from './record-api.ts'
 const inFlight = new Map<string, number>()
 let sequence = 0
 
+/** The cell's value before *any* of its in-flight writes touched it. See point 4 above. */
+const snapshots = new Map<string, EditSnapshot>()
+
 export interface EditVariables {
   readonly row: RecordRow
   readonly field: FieldDescriptor
@@ -45,11 +55,15 @@ export interface EditVariables {
   readonly write: unknown
 }
 
+interface EditSnapshot {
+  readonly lists: [readonly unknown[], RecordListData | undefined][]
+  readonly detail: RecordRow | undefined
+}
+
 interface EditContext {
   readonly key: string
   readonly seq: number
-  readonly lists: [readonly unknown[], RecordListData | undefined][]
-  readonly detail: RecordRow | undefined
+  readonly snapshot: EditSnapshot
 }
 
 export interface RecordEditor {
@@ -90,6 +104,9 @@ export function useRecordEdit(objectType: RecordObjectType): RecordEditor {
 
     onMutate: async ({ row, field, definition, write }) => {
       const key = cellKey(row.id, field.slug)
+      // Read before the write below claims the cell: whether this is the first write decides
+      // whether what the cache holds now is the original value or an earlier optimistic one.
+      const isFirstForCell = !inFlight.has(key)
       sequence += 1
       const seq = sequence
       inFlight.set(key, seq)
@@ -101,20 +118,26 @@ export function useRecordEdit(objectType: RecordObjectType): RecordEditor {
         queryClient.cancelQueries({ queryKey: qk.record(row.id) }),
       ])
 
-      const lists = queryClient.getQueriesData<RecordListData>({
-        queryKey: qk.records(objectType),
-      })
-      const detail = queryClient.getQueryData<RecordRow>(qk.record(row.id))
+      if (isFirstForCell) {
+        snapshots.set(key, {
+          lists: queryClient.getQueriesData<RecordListData>({ queryKey: qk.records(objectType) }),
+          detail: queryClient.getQueryData<RecordRow>(qk.record(row.id)),
+        })
+      }
 
       applyPatch(queryClient, objectType, row.id, (current) =>
         withAttribute(current, field.slug, optimisticValue(definition, write)),
       )
 
-      return { key, seq, lists, detail }
+      return { key, seq, snapshot: snapshots.get(key) ?? { lists: [], detail: undefined } }
     },
 
     onError: (error, variables, context) => {
-      if (context !== undefined) restore(queryClient, context, variables.row.id)
+      // A newer write for the same cell is still in flight; it owns what the cell shows next, and
+      // rolling back under it would put the original value on screen and then take it away again.
+      if (context !== undefined && inFlight.get(context.key) === context.seq) {
+        restore(queryClient, context.snapshot, variables.row.id)
+      }
       toast.error(`Could not save ${variables.field.label}`, {
         description: describe(error),
         action: {
@@ -135,7 +158,11 @@ export function useRecordEdit(objectType: RecordObjectType): RecordEditor {
 
     onSettled: (_record, _error, _variables, context) => {
       if (context === undefined) return
-      if (inFlight.get(context.key) === context.seq) inFlight.delete(context.key)
+      // Only the last write for a cell releases it. An older one settling out of order must not
+      // stop the pulse or drop the snapshot the newer one still needs to roll back to.
+      if (inFlight.get(context.key) !== context.seq) return
+      inFlight.delete(context.key)
+      snapshots.delete(context.key)
       markPending(context.key, false)
     },
   })
@@ -173,11 +200,11 @@ function applyPatch(
 
 function restore(
   queryClient: ReturnType<typeof useQueryClient>,
-  context: EditContext,
+  snapshot: EditSnapshot,
   id: string,
 ): void {
-  for (const [key, data] of context.lists) queryClient.setQueryData(key, data)
-  queryClient.setQueryData(qk.record(id), context.detail)
+  for (const [key, data] of snapshot.lists) queryClient.setQueryData(key, data)
+  queryClient.setQueryData(qk.record(id), snapshot.detail)
 }
 
 function describe(error: Error): string {

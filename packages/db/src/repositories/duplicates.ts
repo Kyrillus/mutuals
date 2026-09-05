@@ -108,7 +108,25 @@ async function normalizeNames(
   return rows.rows.map((row) => row.key)
 }
 
-/** One `IN` over `(kind, value)` for every identifier of every probe. */
+/**
+ * Every identifier of every probe, as **two array parameters** joined against the table.
+ *
+ * The obvious spelling — one `(kind = … AND value = …)` disjunct per identifier — is what this
+ * used to be, and it does not survive the file size §6.8 promises. A 10,000-row LinkedIn export
+ * carries ~16,000 identifiers, and:
+ *
+ *   - Kysely compiles an `OR` tree by recursing once per node, so 16,000 of them raise
+ *     `RangeError: Maximum call stack size exceeded` and the upload 500s before Postgres is asked
+ *     anything at all;
+ *   - the sizes that *do* compile are superlinear — measured at 10,760 records, 200 disjuncts cost
+ *     117 ms, 800 cost 686 ms and 1,600 cost 5.7 s — because the plan is one scan of `identifier`
+ *     with an N-term filter re-evaluated per row;
+ *   - and it is not cancellable. `pg_cancel_backend` and `pg_terminate_backend` both returned true
+ *     against a wedged probe and the backend stayed for eleven minutes; only `kill -9` cleared it.
+ *
+ * A join against `unnest` is two parameters whatever the file size, and the planner probes
+ * `identifier_kind_value_idx` once per pair (migration 0012). 16,000 pairs: **110 ms**.
+ */
 async function probeIdentifiers(
   exec: Executor,
   probes: readonly CandidateProbe[],
@@ -123,19 +141,18 @@ async function probeIdentifiers(
   const refs = [...wanted.values()]
   const objectTypes = [...new Set(probes.map((probe) => probe.objectType))]
 
-  let query = exec
-    .selectFrom('identifier as i')
-    .innerJoin('record as r', 'r.id', 'i.record_id')
-    .select(['i.record_id', 'i.kind', 'i.value'])
-    .where((eb) =>
-      eb.or(
-        refs.map((ref) => eb.and([eb('i.kind', '=', ref.kind), eb('i.value', '=', ref.value)])),
-      ),
-    )
-    .where('r.object_type', 'in', objectTypes)
-  if (excluded.length > 0) query = query.where('i.record_id', 'not in', excluded)
+  const result = await sql<{ record_id: string; kind: IdentifierRef['kind']; value: string }>`
+    select i.record_id, i.kind, i.value
+      from unnest(${sql.val(refs.map((ref) => ref.kind))}::text[],
+                  ${sql.val(refs.map((ref) => ref.value))}::text[]) as q(kind, value)
+      join identifier i on i.kind = q.kind and i.value = q.value
+      join record r on r.id = i.record_id
+     where r.object_type = any(${sql.val(objectTypes)}::object_type[])
+       and (${sql.val(excluded.length)}::int = 0
+            or i.record_id <> all(${sql.val(excluded)}::uuid[]))
+  `.execute(exec)
 
-  const rows = await query.execute()
+  const rows = result.rows
   const byRef = new Map<string, IdentifierHit[]>()
   for (const row of rows) {
     const key = `${row.kind} ${row.value}`

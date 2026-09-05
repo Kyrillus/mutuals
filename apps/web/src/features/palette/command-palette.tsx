@@ -131,6 +131,7 @@ export function CommandPalette({
 
   const searching = query.trim().length >= MIN_SEARCH_LENGTH
   const groups = groupByType(search.data)
+  const matchingActions = ACTIONS.filter((entry) => matchesAction(entry, query))
 
   const run = (action: PaletteAction): void => {
     onOpenChange(false)
@@ -169,7 +170,13 @@ export function CommandPalette({
           )}
 
           {searching && !search.isPending && groups.length === 0 && (
-            <CommandEmpty>Nothing matches “{query.trim()}”.</CommandEmpty>
+            <CommandEmpty>
+              <span className="block">Nothing matches “{query.trim()}”.</span>
+              {/* What was searched, so a miss is a fact about the data rather than a mystery. */}
+              <span className="mt-1 block text-xs">
+                Names, email addresses, links and the text of your notes were all searched.
+              </span>
+            </CommandEmpty>
           )}
 
           {groups.map((group) => (
@@ -200,17 +207,24 @@ export function CommandPalette({
             </CommandGroup>
           ))}
 
-          <CommandGroup heading="Actions">
-            {ACTIONS.filter((entry) => matchesAction(entry, query)).map((entry) => (
-              <Row
-                key={entry.id}
-                entry={entry}
-                onSelect={() => {
-                  run(entry.action)
-                }}
-              />
-            ))}
-          </CommandGroup>
+          {/*
+            The heading is dropped with the last action rather than left standing over nothing.
+            A needle that matches no record usually matches no action either, and an empty
+            "Actions" label under "Nothing matches" reads as a list that failed to load.
+          */}
+          {matchingActions.length > 0 && (
+            <CommandGroup heading="Actions">
+              {matchingActions.map((entry) => (
+                <Row
+                  key={entry.id}
+                  entry={entry}
+                  onSelect={() => {
+                    run(entry.action)
+                  }}
+                />
+              ))}
+            </CommandGroup>
+          )}
 
           {!searching && query.trim() !== '' && (
             <p className="text-muted-foreground px-2 pb-2 text-center text-xs">

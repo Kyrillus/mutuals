@@ -19,7 +19,7 @@ import {
   type ObjectType,
 } from '@mutuals/core'
 
-import { API_BASE, ApiError, api } from '@/lib/api.ts'
+import { API_BASE, ApiError, NetworkError, SLOW_TIMEOUT_MS, TimeoutError, api } from '@/lib/api.ts'
 
 export type { ImportBatchDetail }
 
@@ -46,8 +46,28 @@ export async function uploadImport(input: UploadInput): Promise<ImportBatchDetai
   // Last, so the text fields are parsed before the bytes arrive.
   form.set('file', input.file, input.file.name)
 
-  const response = await fetch(`${API_BASE}/import-batches`, { method: 'POST', body: form })
-  const text = await response.text()
+  // The same three failures `lib/api.ts` translates, because a wizard that reports "Failed to
+  // fetch" on step 1 is the worst possible place in the product to be cryptic.
+  const deadline = AbortSignal.timeout(SLOW_TIMEOUT_MS)
+  let status: number
+  let statusText: string
+  let ok: boolean
+  let text: string
+  try {
+    const response = await fetch(`${API_BASE}/import-batches`, {
+      method: 'POST',
+      body: form,
+      signal: deadline,
+    })
+    status = response.status
+    statusText = response.statusText
+    ok = response.ok
+    text = await response.text()
+  } catch (cause) {
+    if (deadline.aborted) throw new TimeoutError(SLOW_TIMEOUT_MS)
+    throw new NetworkError(cause)
+  }
+
   let body: unknown = null
   if (text !== '') {
     try {
@@ -57,11 +77,11 @@ export async function uploadImport(input: UploadInput): Promise<ImportBatchDetai
     }
   }
 
-  if (!response.ok) {
+  if (!ok) {
     const problem = ProblemSchema.safeParse(body)
     throw new ApiError(
-      response.status,
-      problem.success ? problem.data.detail : `${String(response.status)} ${response.statusText}`,
+      status,
+      problem.success ? problem.data.detail : `${String(status)} ${statusText}`,
       problem.success ? problem.data : null,
     )
   }
@@ -131,7 +151,10 @@ export function replaceInImport(
 }
 
 export function commitImport(id: string, input: { bulkDecision?: string; resume?: boolean } = {}) {
-  return api.post(CommitImportResultSchema, `/import-batches/${id}/commit`, input)
+  // Up to 10,000 rows in one transaction (§6.8), so the default deadline is the wrong one.
+  return api.post(CommitImportResultSchema, `/import-batches/${id}/commit`, input, {
+    timeoutMs: SLOW_TIMEOUT_MS,
+  })
 }
 
 export function getImportErrorReport(id: string) {

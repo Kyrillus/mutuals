@@ -30,6 +30,7 @@
     "db:reproject": "node --env-file-if-exists=.env packages/db/src/bin/reproject.ts",
     "db:check": "node --env-file-if-exists=.env packages/db/src/bin/check.ts",
     "seed": "node --env-file-if-exists=.env packages/db/src/bin/seed.ts",
+    "screenshots": "node scripts/screenshots.mjs",
     "build": "pnpm --filter @mutuals/api build && pnpm --filter @mutuals/web build",
     "start": "node --env-file-if-exists=.env apps/api/dist/main.js",
     "format": "prettier --check .",

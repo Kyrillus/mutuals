@@ -313,8 +313,14 @@
 }
 
 @layer base {
+  /*
+   * `outline-ring` at full strength, not shadcn's `/40`: this sets the default outline *colour*
+   * for anything that draws one, and a 40% ring composites to 1.86:1 against the page — under
+   * WCAG 1.4.11's 3:1 for a state indicator. `contrast.test.ts` measures every alpha in the
+   * source and fails on that number.
+   */
   * {
-    @apply border-border outline-ring/40;
+    @apply border-border outline-ring;
   }
 
   body {

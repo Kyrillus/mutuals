@@ -153,7 +153,7 @@ export function OptionRetireDialog({
                         onClick={() => {
                           setPlan({ mode: 'remap', toOptionKey: candidate.key })
                         }}
-                        className="focus-visible:ring-ring/50 rounded focus-visible:ring-[3px] focus-visible:outline-none"
+                        className="focus-visible:ring-ring/80 rounded focus-visible:ring-[3px] focus-visible:outline-none"
                       >
                         <Chip
                           color={candidate.color}

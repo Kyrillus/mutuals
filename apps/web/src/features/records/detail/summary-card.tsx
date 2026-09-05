@@ -15,7 +15,7 @@ import { Loader2, RefreshCw, Sparkles } from 'lucide-react'
 
 import { useDisplay } from '@/attributes/display-context.tsx'
 import { formatDateTime } from '@/attributes/format.ts'
-import { api } from '@/lib/api.ts'
+import { SLOW_TIMEOUT_MS, api } from '@/lib/api.ts'
 import { qk } from '@/lib/query.ts'
 import { Button } from '@/ui/button.tsx'
 import { Skeleton } from '@/ui/skeleton.tsx'
@@ -31,7 +31,13 @@ export function SummaryCard({ contactId }: { contactId: string }) {
   })
 
   const generate = useMutation({
-    mutationFn: () => api.post(ContactSummarySchema, `/contacts/${contactId}/summary`, {}),
+    mutationFn: () =>
+      api.post(
+        ContactSummarySchema,
+        `/contacts/${contactId}/summary`,
+        {},
+        { timeoutMs: SLOW_TIMEOUT_MS },
+      ),
     onSuccess: (next: ContactSummary) => {
       queryClient.setQueryData(qk.contactSummary(contactId), next)
     },

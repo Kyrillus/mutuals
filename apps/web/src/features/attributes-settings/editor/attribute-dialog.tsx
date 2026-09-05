@@ -186,11 +186,12 @@ export function AttributeDialog({
           ) : (
             <div className="flex flex-col gap-4">
               <FieldRow label="Title" required error={shown('title')}>
-                {({ id, describedBy }) => (
+                {({ id, describedBy, required }) => (
                   <Input
                     id={id}
                     autoFocus
                     aria-describedby={describedBy}
+                    aria-required={required}
                     aria-invalid={shown('title') !== undefined}
                     value={draft.title}
                     placeholder="Ticket size"
@@ -216,10 +217,11 @@ export function AttributeDialog({
                   )
                 }
               >
-                {({ id, describedBy }) => (
+                {({ id, describedBy, required }) => (
                   <Input
                     id={id}
                     aria-describedby={describedBy}
+                    aria-required={required}
                     aria-invalid={shown('slug') !== undefined}
                     disabled={mode === 'edit'}
                     value={draft.slug}
@@ -246,13 +248,15 @@ export function AttributeDialog({
                   ) : undefined
                 }
               >
-                {({ id, describedBy }) =>
+                {({ id, labelId, describedBy, required }) =>
                   mode === 'edit' ? (
-                    <TypeDisplay id={id} value={draft.type} />
+                    <TypeDisplay id={id} labelledBy={labelId} value={draft.type} />
                   ) : (
                     <TypeSelect
                       id={id}
                       describedBy={describedBy}
+                      labelledBy={labelId}
+                      required={required}
                       value={draft.type}
                       onChange={(next: AttributeType) => {
                         edit(setType(draft, next))
@@ -266,10 +270,11 @@ export function AttributeDialog({
                 label="Group"
                 help="Where the field sits on a contact's page. Pick one, or type a new name."
               >
-                {({ id, describedBy }) => (
+                {({ id, labelId, describedBy }) => (
                   <GroupCombobox
                     id={id}
                     describedBy={describedBy}
+                    labelledBy={labelId}
                     value={draft.group}
                     groups={groups}
                     onChange={(next) => {
@@ -291,7 +296,7 @@ export function AttributeDialog({
                     rows={2}
                     value={draft.description}
                     placeholder="What belongs in this field?"
-                    className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 placeholder:text-muted-foreground w-full resize-y rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px]"
+                    className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/80 placeholder:text-muted-foreground w-full resize-y rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px]"
                     onChange={(event) => {
                       edit({ ...draft, description: event.target.value })
                     }}

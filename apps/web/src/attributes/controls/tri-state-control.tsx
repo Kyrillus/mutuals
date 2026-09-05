@@ -88,7 +88,7 @@ export function TriStateControl({
             }}
             className={cn(
               'h-full rounded-sm px-2 text-xs font-medium transition-colors outline-none',
-              'focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+              'focus-visible:ring-ring/80 focus-visible:ring-[3px]',
               checked
                 ? 'bg-secondary text-secondary-foreground'
                 : 'text-muted-foreground hover:text-foreground',

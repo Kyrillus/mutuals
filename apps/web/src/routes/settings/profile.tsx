@@ -12,13 +12,18 @@ export const Route = createFileRoute('/settings/profile')({
 function ProfilePage() {
   const profile = useProfile()
 
+  // A fresh workspace has a profile row whose names are empty strings, not nulls — and an empty
+  // string renders as nothing at all, which reads as a broken page rather than as a blank field.
+  const filled = (value: string | null | undefined): string | null =>
+    value === undefined || value === null || value.trim() === '' ? null : value
+
   const rows: { label: string; value: string | null }[] = [
-    { label: 'First name', value: profile.data?.firstName ?? null },
-    { label: 'Last name', value: profile.data?.lastName ?? null },
-    { label: 'Email', value: profile.data?.email ?? null },
-    { label: 'Language', value: profile.data?.language ?? null },
-    { label: 'Phone region', value: profile.data?.phoneRegion ?? null },
-    { label: 'Time zone', value: profile.data?.timeZone ?? null },
+    { label: 'First name', value: filled(profile.data?.firstName) },
+    { label: 'Last name', value: filled(profile.data?.lastName) },
+    { label: 'Email', value: filled(profile.data?.email) },
+    { label: 'Language', value: filled(profile.data?.language) },
+    { label: 'Phone region', value: filled(profile.data?.phoneRegion) },
+    { label: 'Time zone', value: filled(profile.data?.timeZone) },
   ]
 
   return (

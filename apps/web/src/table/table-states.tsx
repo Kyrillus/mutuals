@@ -65,16 +65,42 @@ export function TableMessageRow({
   )
 }
 
-export function NoMatchesRow({ columns, onClear }: { columns: number; onClear: () => void }) {
+/**
+ * Nothing matched — and *why* nothing matched is the whole message.
+ *
+ * A search and a filter fail differently and are fixed differently, so the sentence names the one
+ * the reader actually used. Telling somebody who typed three letters into the search box to "loosen
+ * a filter" sends them looking for a filter that is not there.
+ */
+export function NoMatchesRow({
+  columns,
+  noun,
+  filterCount,
+  search,
+  onClear,
+}: {
+  columns: number
+  noun: string
+  filterCount: number
+  search: string | null
+  onClear: () => void
+}) {
+  const searched = search !== null && search.trim() !== ''
   return (
     <TableMessageRow
       columns={columns}
       icon={SearchXIcon}
-      title="Nothing matches"
-      description="No records satisfy every active filter. Loosen one, or clear them all and start again."
+      title={searched ? `No ${noun} matches “${search.trim()}”` : `No ${noun} matches`}
+      description={
+        filterCount === 0
+          ? `The search runs over the text columns on screen. Try a shorter word, or add the column you are looking in from the Columns menu.`
+          : searched
+            ? `Nothing satisfies the search and all ${String(filterCount)} ${filterCount === 1 ? 'filter' : 'filters'} at once. Filters combine with AND, so removing one widens the result.`
+            : `Nothing satisfies all ${String(filterCount)} ${filterCount === 1 ? 'filter' : 'filters'} at once. Filters combine with AND, so removing one widens the result.`
+      }
     >
       <Button variant="outline" size="sm" onClick={onClear}>
-        Clear filters and search
+        {filterCount === 0 ? 'Clear the search' : 'Clear filters and search'}
       </Button>
     </TableMessageRow>
   )
