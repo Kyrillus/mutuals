@@ -126,6 +126,24 @@ async function normalizeLabels(
   return rows.rows.map((row) => row.key)
 }
 
+/**
+ * Existing organizations by name, **without creating any**.
+ *
+ * Duplicate detection needs this and must not have find-or-create: probing "who could this contact
+ * be" is a read, and a read that creates a company as a side effect would populate the workspace
+ * from a file nobody has confirmed yet. The keys are `mutuals_norm` output, so the caller gets back
+ * the same keys it can look its rows up by.
+ */
+export async function findOrganizationsByName(
+  exec: Executor,
+  names: readonly string[],
+): Promise<{ byKey: ReadonlyMap<string, Uuid>; keys: readonly string[] }> {
+  const keys = await normalizeLabels(exec, names)
+  const wanted = [...new Set(keys.filter((key) => key !== ''))]
+  if (wanted.length === 0) return { byKey: new Map(), keys }
+  return { byKey: new Map(await lookup(exec, wanted)), keys }
+}
+
 async function lookup(exec: Executor, keys: readonly string[]): Promise<readonly [string, Uuid][]> {
   const rows = await exec
     .selectFrom('record')

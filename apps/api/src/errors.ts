@@ -78,6 +78,31 @@ export function conflict(detail: string): ApiError {
   return new ApiError({ status: 409, code: 'conflict', title: 'Conflict', detail })
 }
 
+/**
+ * §6.8's upload, handed a file it cannot read.
+ *
+ * The accepted extensions go in the detail rather than only in the docs: the person who sees this
+ * is mid-import with a file in their hand, and "Mutuals reads .csv and .xlsx" is the whole answer.
+ */
+export function unsupportedMediaType(detail: string, accepted: readonly string[]): ApiError {
+  return new ApiError({
+    status: 415,
+    code: 'unsupported_media_type',
+    title: 'Unsupported file type',
+    detail: `${detail} Accepted: ${accepted.join(', ')}.`,
+  })
+}
+
+/** Above the upload limit. §6.8 promises 10k rows, not an arbitrary file. */
+export function payloadTooLarge(detail: string): ApiError {
+  return new ApiError({
+    status: 413,
+    code: 'payload_too_large',
+    title: 'File too large',
+    detail,
+  })
+}
+
 /** §7's Stage-6 surface: documented, reachable, and honest about not being built yet. */
 export function notImplemented(operation: string, stage: string): ApiError {
   return new ApiError({

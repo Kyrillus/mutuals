@@ -61,6 +61,21 @@ export const OPERATIONS = [
   'updateView',
   'deleteView',
 
+  // -- The import wizard (§6.8) -----------------------------------------------------------------
+  'createImportBatch',
+  'getImportBatch',
+  // Not in ADR-031's list. It reserved an operation for editing one row and none for step 3's
+  // `Confirm mapping`, which is the wizard's central act — see ADR-098. The alternative was
+  // overloading `updateImportRow`, which is the "second name for one thing" this file exists to
+  // prevent.
+  'updateImportBatch',
+  'updateImportRow',
+  'revertImportRow',
+  'replaceInImportBatch',
+  'exportImportBatch',
+  'commitImportBatch',
+  'getImportErrorReport',
+
   // -- Dashboard and settings (§6.1, §6.6) ------------------------------------------------------
   'getStats',
   'getProfile',
@@ -78,21 +93,13 @@ export type OperationId = (typeof OPERATIONS)[number]
  * ADR-031's remaining names, kept here so the complete surface stays reviewable while the routes
  * that implement them do not exist yet.
  *
- * - The import wizard and merge arrive with Stage 5. Saved views left this list in Stage 4.
+ * - Merge is Stage 5's session B (ADR-098). The import's eight names left this list in session A,
+ *   which also added a ninth — `updateImportBatch` — that ADR-031 had not foreseen.
  */
 export const PLANNED_OPERATIONS = [
   'mergeContacts',
   'previewMergeContacts',
   'mergeOrganizations',
-
-  'createImportBatch',
-  'getImportBatch',
-  'updateImportRow',
-  'revertImportRow',
-  'replaceInImportBatch',
-  'exportImportBatch',
-  'commitImportBatch',
-  'getImportErrorReport',
 ] as const
 
 export type PlannedOperationId = (typeof PLANNED_OPERATIONS)[number]

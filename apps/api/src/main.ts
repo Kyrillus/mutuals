@@ -11,6 +11,7 @@ import { assertSchemaCurrent, makeDb, sweepIfStale, type Executor } from '@mutua
 
 import { buildApp } from './app.ts'
 import { loadEnv, type Env } from './env.ts'
+import { startWorker } from './jobs/register.ts'
 
 async function main(): Promise<void> {
   const env = loadEnv()
@@ -27,12 +28,28 @@ async function main(): Promise<void> {
     return
   }
 
-  const app = await buildApp({ db, env, now: () => new Date() })
+  const now = (): Date => new Date()
+
+  /**
+   * The worker starts before the app, because the app's context has to carry the queue: a route
+   * that enqueues gets it from `ctx.jobs`, and a context built without it would mean either a
+   * mutable context or a second one.
+   */
+  const jobs = await startWorker({
+    env,
+    logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
+    context: { db, env, now },
+  })
+
+  const app = await buildApp({ db, env, now, ...(jobs === undefined ? {} : { jobs }) })
 
   const shutdown = (signal: string): void => {
     app.log.info({ signal }, 'shutting down')
     void app
       .close()
+      // The queue before the pool: `stop({ graceful: true })` lets a running import finish its
+      // chunk and record where it got to, which is what makes a restart resumable (ADR-061).
+      .then(() => jobs?.stop())
       .then(() => db.destroy())
       .then(() => process.exit(0))
   }

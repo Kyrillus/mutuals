@@ -16,7 +16,12 @@ import {
   type TypeContext,
 } from '@mutuals/core'
 import { normalizePhone } from '@mutuals/core/phone'
-import { listAttributeDefinitions, resolveWorkspaceId, type Executor } from '@mutuals/db'
+import {
+  listAttributeDefinitions,
+  resolveWorkspaceId,
+  type Executor,
+  type JobQueue,
+} from '@mutuals/db'
 
 import type { Env } from './env.ts'
 
@@ -24,6 +29,16 @@ export interface AppContext {
   readonly db: Executor
   readonly env: Env
   readonly now: () => Date
+  /**
+   * The job queue (ADR-058), or `undefined` when this process runs no worker.
+   *
+   * Optional rather than required because ADR-062 makes the worker in-process *by default* and not
+   * always: `MUTUALS_WORKER=off` is how the scale-out path is enabled, and a route that enqueues
+   * has to answer honestly rather than throw a type error into a 500. `operations.test.ts` also
+   * builds the app with no database at all, and giving it a live queue to satisfy a type would mean
+   * connecting to Postgres to check a list of route names.
+   */
+  readonly jobs?: JobQueue
 }
 
 /**

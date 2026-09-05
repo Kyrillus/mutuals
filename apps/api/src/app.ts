@@ -10,6 +10,7 @@
  * the result in, which is what lets an integration test drive the real app over the test database
  * with `app.inject()` (ADR-075).
  */
+import multipart from '@fastify/multipart'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import Fastify, { type FastifyInstance } from 'fastify'
@@ -28,6 +29,7 @@ import { DOCS_PREFIX, registerAuth } from './plugins/auth.ts'
 import { attributeDefinitionRoutes } from './routes/attribute-definitions.ts'
 import { contactRoutes } from './routes/contacts.ts'
 import { followUpRoutes } from './routes/follow-ups.ts'
+import { importBatchRoutes } from './routes/import-batches.ts'
 import { interactionRoutes } from './routes/interactions.ts'
 import { organizationRoutes } from './routes/organizations.ts'
 import { recordRoutes } from './routes/records.ts'
@@ -110,6 +112,16 @@ export async function buildApp(ctx: AppContext, options: BuildOptions = {}): Pro
       )
   })
 
+  /**
+   * §6.8's upload. Registered before the routes so `request.parts()` exists on the one route that
+   * uses it; every other route stays JSON.
+   *
+   * The per-file limit is enforced in the route rather than here, because a rejection from this
+   * plugin is a generic 413 with no detail, and the person hitting it is mid-import and deserves to
+   * be told what the limit is.
+   */
+  await app.register(multipart, { limits: { files: 1, fields: 8 } })
+
   registerOpenApiSchemas()
 
   await app.register(swagger, {
@@ -135,6 +147,7 @@ export async function buildApp(ctx: AppContext, options: BuildOptions = {}): Pro
         { name: 'follow-ups', description: 'Reminders, with recurrence (§6.4)' },
         { name: 'attributes', description: 'User-defined fields (§4.2, §6.7)' },
         { name: 'views', description: 'Saved table views (§6.6)' },
+        { name: 'imports', description: 'The import wizard: upload, map, review, commit (§6.8)' },
         { name: 'dashboard', description: 'Counts and the profile (§6.1, §6.6)' },
         { name: 'agent', description: 'Search, ask and quick capture — Stage 6 (§4.8)' },
       ],
@@ -161,6 +174,7 @@ export async function buildApp(ctx: AppContext, options: BuildOptions = {}): Pro
       await instance.register(recordRoutes, { ctx })
       await instance.register(interactionRoutes, { ctx })
       await instance.register(followUpRoutes, { ctx })
+      await instance.register(importBatchRoutes, { ctx })
       await instance.register(attributeDefinitionRoutes, { ctx })
       await instance.register(settingsRoutes, { ctx })
       await instance.register(viewRoutes, { ctx })

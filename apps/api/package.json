@@ -4,11 +4,16 @@
   "private": true,
   "type": "module",
   "description": "The public API. Every client -- the web app, a CLI, an MCP server -- speaks only this.",
+  "exports": {
+    "./env": "./src/env.ts",
+    "./jobs": "./src/jobs/register.ts"
+  },
   "scripts": {
     "dev": "node --watch --env-file-if-exists=../../.env src/main.ts",
     "build": "esbuild src/main.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/main.js"
   },
   "dependencies": {
+    "@fastify/multipart": "10.1.1",
     "@fastify/swagger": "9.8.1",
     "@fastify/swagger-ui": "6.1.1",
     "@mutuals/core": "workspace:*",

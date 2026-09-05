@@ -36,27 +36,38 @@ beforeEach(async () => {
   })
 })
 
+/**
+ * `raw` is `{ cells }` — the file's own row, by column index, and never written to. Edits live in
+ * `raw.edits` as an overlay, which is what makes a revert possible and what find-and-replace writes.
+ * Columns here are: 0 first name, 1 last name, 2 city.
+ */
 async function stage(): Promise<void> {
   await stageImportRows(testDb(), batch, [
     {
       rowNumber: 1,
-      raw: { 'First Name': 'Anna' },
+      raw: { cells: ['Anna', 'Berger', 'Munich'] },
       mapped: { first_name: 'Anna', last_name: 'Berger', city: 'Munich' },
       errors: [],
     },
     {
       rowNumber: 2,
-      raw: { 'First Name': 'Ana' },
+      raw: { cells: ['Ana', 'Silva', 'Munich'] },
       mapped: { first_name: 'Ana', last_name: 'Silva', city: 'Munich' },
       errors: [{ code: 'invalid_email', path: ['email'], message: 'not an email' }],
     },
     {
       rowNumber: 3,
-      raw: { 'First Name': 'Jonas' },
+      raw: { cells: ['Jonas', 'Weber', ''] },
       mapped: { first_name: 'Jonas', last_name: 'Weber', pinned_important: true },
       errors: [],
     },
   ])
+}
+
+/** The cell as the grid would show it: the edit overlay if there is one, else the file's value. */
+function cellOf(row: { raw: unknown }, index: number): string {
+  const raw = row.raw as { cells: string[]; edits?: Record<string, string> }
+  return raw.edits?.[String(index)] ?? raw.cells[index] ?? ''
 }
 
 describe('the batch', () => {
@@ -205,25 +216,34 @@ describe('the counters the Review header shows', () => {
 })
 
 describe('find and replace', () => {
+  const CITY = 2
+
   beforeEach(stage)
 
-  it('rewrites one target across the batch and says which rows moved', async () => {
+  /**
+   * The bug this shape exists to prevent: the first version wrote into `mapped`, and every re-map
+   * derives `mapped` from `raw` — so a replacement survived until the next mapping change and then
+   * silently vanished. Writing the overlay means it survives, and stays revertible.
+   */
+  it('rewrites the source cell, not the derived value', async () => {
     const moved = await replaceInImportBatch(testDb(), batch, {
-      targetId: 'city',
+      columnIndex: CITY,
       find: 'Munich',
       replace: 'München',
     })
     expect([...moved].sort()).toEqual([1, 2])
 
     const rows = await listImportRows(testDb(), batch)
-    expect((rows[0]?.mapped as Record<string, string>)['city']).toBe('München')
-    expect((rows[2]?.mapped as Record<string, string>)['city']).toBeUndefined()
+    expect(cellOf(rows[0] as { raw: unknown }, CITY)).toBe('München')
+    expect(cellOf(rows[2] as { raw: unknown }, CITY)).toBe('')
+    // The file's own value is still underneath, which is what a revert goes back to.
+    expect((rows[0]?.raw as { cells: string[] }).cells[CITY]).toBe('Munich')
   })
 
   it('is case-insensitive by default and exact when asked', async () => {
     expect(
       await replaceInImportBatch(testDb(), batch, {
-        targetId: 'city',
+        columnIndex: CITY,
         find: 'munich',
         replace: 'Munich',
       }),
@@ -231,7 +251,7 @@ describe('find and replace', () => {
 
     expect(
       await replaceInImportBatch(testDb(), batch, {
-        targetId: 'city',
+        columnIndex: CITY,
         find: 'munich',
         replace: 'nope',
         caseSensitive: true,
@@ -241,40 +261,31 @@ describe('find and replace', () => {
 
   /** A search for `a.b` must not match `axb`: the needle is text, not a pattern. */
   it('treats a regex metacharacter as a literal', async () => {
-    await updateImportRow(testDb(), batch, 1, { mapped: { first_name: 'Anna', city: 'M.nich' } })
+    await replaceInImportBatch(testDb(), batch, {
+      columnIndex: CITY,
+      find: 'Munich',
+      replace: 'M.nich',
+    })
+    const hits = await replaceInImportBatch(testDb(), batch, {
+      columnIndex: CITY,
+      find: 'M.nich',
+      replace: 'Salzburg',
+    })
+    expect([...hits].sort()).toEqual([1, 2])
 
-    expect(
-      await replaceInImportBatch(testDb(), batch, {
-        targetId: 'city',
-        find: 'M.nich',
-        replace: 'Munich',
-      }),
-    ).toEqual([1])
-    // The literal needle must not have matched row 2's real "Munich".
     const rows = await listImportRows(testDb(), batch)
-    expect((rows[1]?.mapped as Record<string, string>)['city']).toBe('Munich')
+    expect(cellOf(rows[0] as { raw: unknown }, CITY)).toBe('Salzburg')
   })
 
-  /**
-   * A replacement on a boolean is a category error. `jsonb_typeof` refuses it rather than coercing,
-   * which would turn `true` into the string `"true"` and change the cell's type behind the user.
-   */
-  it('leaves a cell that is not a string alone', async () => {
-    expect(
-      await replaceInImportBatch(testDb(), batch, {
-        targetId: 'pinned_important',
-        find: 'true',
-        replace: 'false',
-      }),
-    ).toEqual([])
-
+  it('replaces every occurrence within one cell', async () => {
+    await replaceInImportBatch(testDb(), batch, { columnIndex: 1, find: 'e', replace: 'E' })
     const rows = await listImportRows(testDb(), batch)
-    expect((rows[2]?.mapped as Record<string, unknown>)['pinned_important']).toBe(true)
+    expect(cellOf(rows[0] as { raw: unknown }, 1)).toBe('BErgEr')
   })
 
   it('does nothing for an empty needle rather than matching every row', async () => {
     expect(
-      await replaceInImportBatch(testDb(), batch, { targetId: 'city', find: '', replace: 'x' }),
+      await replaceInImportBatch(testDb(), batch, { columnIndex: CITY, find: '', replace: 'x' }),
     ).toEqual([])
   })
 
@@ -284,15 +295,15 @@ describe('find and replace', () => {
       objectType: 'contact',
     })
     await stageImportRows(testDb(), other, [
-      { rowNumber: 1, raw: {}, mapped: { city: 'Munich' }, errors: [] },
+      { rowNumber: 1, raw: { cells: ['x', 'y', 'Munich'] }, errors: [] },
     ])
 
     await replaceInImportBatch(testDb(), batch, {
-      targetId: 'city',
+      columnIndex: CITY,
       find: 'Munich',
       replace: 'München',
     })
     const rows = await listImportRows(testDb(), other)
-    expect((rows[0]?.mapped as Record<string, string>)['city']).toBe('Munich')
+    expect(cellOf(rows[0] as { raw: unknown }, CITY)).toBe('Munich')
   })
 })

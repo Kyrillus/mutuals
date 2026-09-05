@@ -1,0 +1,16 @@
+{
+  "name": "@mutuals/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The background worker, in its own process. Config-only scale-out (ADR-062).",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../../.env src/main.ts",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/main.js"
+  },
+  "dependencies": {
+    "@mutuals/api": "workspace:*",
+    "@mutuals/core": "workspace:*",
+    "@mutuals/db": "workspace:*"
+  }
+}

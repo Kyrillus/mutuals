@@ -35,11 +35,31 @@ export const EnvSchema = z.object({
   TEST_DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).optional(),
   /** The same for the Playwright suite. The API never reads it; it is here so the pair stays in sync. */
   E2E_DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).optional(),
+  /**
+   * A managed Postgres reached through a transaction pooler, for the pg-boss lifecycle test
+   * (ADR-095, §13's R7).
+   *
+   * **Optional with no default, deliberately.** ADR-058 claims pg-boss is safe through Supabase's
+   * transaction pooler by reasoning from `pg_advisory_xact_lock()` being transaction-scoped, and
+   * that has never been measured. The test is written and skips unless this is set. A default —
+   * even one pointing at local Postgres — would make it pass on the evidence of nothing, which is
+   * the one outcome worse than skipping.
+   */
+  POOLER_DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).optional(),
 
   // -- API -----------------------------------------------------------------------------------
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
+
+  /**
+   * Whether this process runs the background worker (ADR-062).
+   *
+   * `on` by default, because §12 asks for one command on a laptop with no process manager. `off`
+   * is the entire scale-out path: the API stops working jobs and `apps/worker` runs them in its
+   * own process, config-only, no code change.
+   */
+  MUTUALS_WORKER: z.enum(['on', 'off']).default('on'),
 
   /**
    * Used until the user saves a Profile (ADR-045). Both are load-bearing: a national phone number

@@ -51,6 +51,7 @@ export * from './import/dates.ts'
 export * from './import/duplicates.ts'
 export * from './import/header.ts'
 export * from './import/presets.ts'
+export * from './import/rows.ts'
 export * from './import/synonyms.ts'
 export * from './import/targets.ts'
 
