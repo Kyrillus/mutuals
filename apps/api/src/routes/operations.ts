@@ -24,6 +24,8 @@ export const OPERATIONS = [
   'bulkDeleteContacts',
   'bulkUpdateContactAttribute',
   'getContactConnections',
+  'previewMergeContacts',
+  'mergeContacts',
 
   // -- Records, whatever kind (§4.5) -------------------------------------------------------------
   'getValueHistory',
@@ -34,6 +36,7 @@ export const OPERATIONS = [
   'createOrganization',
   'updateOrganization',
   'deleteOrganization',
+  'mergeOrganizations',
 
   // -- Interactions (§6.5) ----------------------------------------------------------------------
   'listInteractions',
@@ -93,14 +96,12 @@ export type OperationId = (typeof OPERATIONS)[number]
  * ADR-031's remaining names, kept here so the complete surface stays reviewable while the routes
  * that implement them do not exist yet.
  *
- * - Merge is Stage 5's session B (ADR-098). The import's eight names left this list in session A,
- *   which also added a ninth — `updateImportBatch` — that ADR-031 had not foreseen.
+ * **Empty as of Stage 5.** Every name ADR-031 enumerated in Stage 1 is now registered, and the only
+ * one that was ever added along the way is recorded in ADR-098 rather than smuggled in. The array
+ * stays — the test asserts it is disjoint from `OPERATIONS`, which is the guard that made this list
+ * worth keeping, and Stage 6 will have names of its own to put here.
  */
-export const PLANNED_OPERATIONS = [
-  'mergeContacts',
-  'previewMergeContacts',
-  'mergeOrganizations',
-] as const
+export const PLANNED_OPERATIONS = [] as const
 
 export type PlannedOperationId = (typeof PLANNED_OPERATIONS)[number]
 

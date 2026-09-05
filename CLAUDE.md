@@ -86,8 +86,11 @@ either. `docs/HANDOFF.md` has the rest of the environment notes.
 4. ~~**Follow-ups + dashboard + saved views**~~ — the follow-ups page with its quick-filter tabs and
    recurrence, §6.1's dashboard, and §6.6's saved views over ADR-048's URL-is-the-working-copy model.
    **Done**, in PR #1 (ADR-089).
-5. **Import wizard + duplicates + merge** ← _current_
-6. LLM layer (ask, quick capture, summaries) + command palette
+5. ~~**Import wizard + duplicates + merge**~~ — §6.8's five-step wizard with CSV and XLSX, ADR-044's
+   auto-mapping, duplicate detection against records _and_ within one file, and §6.9's merge for
+   contacts and organizations. **Done**, in PR #1 (ADR-089); ADR-095 to ADR-101 record what it
+   settled.
+6. **LLM layer (ask, quick capture, summaries) + command palette** ← _current_
 7. Polish and `v0.1.0`
 
 Each stage ends with green CI, updated docs, a PR and a stop for approval.

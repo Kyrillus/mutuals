@@ -12,32 +12,52 @@ talked to.
 
 ## Where the work stopped
 
-**Stages 1 to 4 are done.** Everything lives in
+**Stages 1 to 5 are done.** Everything lives in
 [PR #1](https://github.com/Kyrillus/mutuals/pull/1), which grew to cover them together and was
 retitled — see ADR-089 for why, and why that was Simon's call rather than a default.
 
 **Stage 1** built the engine: migrations, the fact log and its projector, the attribute registry,
 the filter compiler, the API and the seed. **Stage 2** built the app shell in light and dark, the one
 shared `DataTable` with its filter bar and inline editing, Settings → Attributes, and the Playwright
-suite with the third CI job.
+suite with the third CI job. **Stage 3** added the organizations table and detail page,
+contact↔organization links through the UI, §6.5's contact detail page with its four tabs,
+interactions CRUD, and §4.5's value-history popover. **Stage 4** added §6.4's follow-ups, §6.1's
+dashboard and §6.6's saved views.
 
-**Stage 3** added the organizations table and detail page, contact↔organization links through the
-UI, §6.5's contact detail page with its four tabs, interactions CRUD, and §4.5's value-history
-popover — the first screen that reads the append-only log.
+**Stage 5** added §6.8's import wizard and §6.9's merge. The wizard reads CSV and XLSX, finds a
+header row under LinkedIn's preamble, auto-maps columns through ADR-044's seven-step cascade, stages
+every row server-side, detects duplicates against existing records **and within the file itself**,
+and commits in chunks through a pg-boss job. Merge moves the loser's facts onto the survivor rather
+than deleting them. `PLANNED_OPERATIONS` is now **empty**: every operation ADR-031 enumerated in
+Stage 1 is registered.
 
-**Stage 4** added §6.4's follow-ups — the page with its quick-filter tabs, create/edit, mark done,
-snooze, and the Follow-ups tab on a contact — §6.1's dashboard, and §6.6's saved views. Q6 is
-answered and shipped (ADR-093); ADR-094 records what building views settled.
-
-`pnpm verify` is green: 1,160 unit tests, 311 integration tests, lint, typecheck and build clean.
-`pnpm verify:e2e` is green: **18 specs — 17 run, 1 `fixme`**. That one is the LinkedIn import, and it
-is exactly what Stage 5 turns into a real test.
+`pnpm verify` is green: **1,259 unit tests, 416 integration tests** (plus one skipped on purpose —
+see R7 below), lint, typecheck and build clean. `pnpm verify:e2e` is green: **21 specs, all
+running.** The LinkedIn import spec that sat `fixme` from Stage 1 is real.
 
 **Do not merge PR #1.** `main` has moved on — another session built a getmutuals.ai waitlist site in
 `site/`, which this branch never touches. Merging PR #1 today would delete the old German Next.js
 prototype from `main`, and Simon's instruction was to leave it there. The only real conflict is two
 lines of `.gitignore`. Simon has said explicitly: **do nothing about it.** Revisit at Stage 7.
-Retitling the PR and rewriting its body is not merging, and ADR-089 records that he asked for it.
+
+## What Stage 5 changed that reaches beyond Stage 5
+
+Three things a Stage 6 session will meet and should not rediscover.
+
+- **ADR-099 moved the duplicate-matching thresholds, for the whole product.** `FUZZY_NAME_THRESHOLD`
+  was 0.75, unjustified and uncommented since Stage 1; it is now **0.65**, on measured evidence in
+  the ADR. A separate `NAME_CANDIDATE_THRESHOLD` of 0.45 governs which records enter the pool at
+  all — using one number for both had made `name_initial_org_same` dead code in production, because
+  "J. Weber" scores 0.5385 against "Jonas Weber" and the candidate never arrived. Quick capture
+  (§4.8) calls the same matcher, so it inherits both.
+- **`name_exact_city_same` cannot fire from any path that would have to name the city attribute by
+  slug.** Populating `cityKey` means asking for "the city attribute", and a seeded attribute the
+  user may rename or delete is exactly what the one rule forbids naming. Closing it needs a declared
+  _semantic marker_ on attribute definitions — a real Stage 6+ conversation, not a bug.
+- **pg-boss is live, in-process by default (ADR-062).** `MUTUALS_WORKER=off` on the API plus
+  `apps/worker` is the whole scale-out path. Four of ADR-058's assumptions about its API were wrong
+  and are corrected in code with comments; the one that bites hardest is that `singletonKey`
+  deduplicates nothing unless the queue is created `stately`.
 
 ## What only existed in the chat, and now exists here
 
@@ -45,53 +65,43 @@ These are Simon's decisions, made in conversation. The first three are also reco
 questions in `docs/DECISIONS.md` §14; they are repeated here because they are easy to violate.
 
 - **Ignore `main` completely.** Nothing is ported from the old prototype — not code, not fixtures,
-  not the ~1,128 contacts in its local SQLite file. That file sits untracked in `data/` and is not
-  referenced by anything on this branch. There is no SQLite→Postgres migration and none is planned.
-- **`asks` / `offers` stay `tags`-typed**, per §4.1 — but **always carry the date**. That is free:
-  each tag element is a fact with `valid_from`, and removing one writes a superseding fact rather
-  than a delete, so "asking since June 2025" and "stopped asking in March 2026" are both recorded.
-  Show the since-date inline on those two attributes, not only in the history popover.
+  not the ~1,128 contacts in its local SQLite file. There is no SQLite→Postgres migration and none
+  is planned.
+- **`asks` / `offers` stay `tags`-typed**, per §4.1 — but **always carry the date**. Show the
+  since-date inline on those two attributes, not only in the history popover.
 - **Both light and dark mode ship**, with a three-state switcher (light / dark / system, following
-  the OS live). This supersedes ADR-056's "dark tokens ship but there is no toggle", and it is why
-  `apps/web/src/styles/contrast.test.ts` exists — it found a real failure when it was written.
+  the OS live). This supersedes ADR-056's "dark tokens ship but there is no toggle".
 - **Simon has approved how the app looks.** He ran it and said so. Do not redesign the shell.
-- **Bugs go to him the moment he finds one, not in a batch** (asked and answered 2026-09-04). His
-  reasoning is the right one: a collected bug has lost its context by the time anybody reads it. The
-  agreement in return is that _trivial_ fixes happen on the spot, and anything needing a design
-  choice is brought to him rather than decided quietly.
+- **Bugs go to him the moment he finds one, not in a batch.** A collected bug has lost its context
+  by the time anybody reads it. In return, _trivial_ fixes happen on the spot and anything needing a
+  design choice is brought to him.
 - **One stage, one session.** Each stage — and for a large one, each half — starts a fresh chat with
-  the prompt below. That is why this file has to be complete: it is the only thing that crosses the
-  gap. If something matters and lives only in a transcript, it is lost.
+  the prompt below. Stage 5 was run as two halves in one session and it worked, but only because
+  every decision was written to `docs/DECISIONS.md` before the build rather than after.
 
-**One question is still open, and it is not needed until Stage 6:** **Q7** — the LLM daily spending
-cap defaults to **$2.00/day** and nobody has confirmed that number. Ask when the LLM layer starts,
-not before.
+**One question is still open and Stage 6 is where it lands: Q7** — the LLM daily spending cap
+defaults to **$2.00/day** and nobody has confirmed that number. **Ask it in the first message of the
+Stage 6 session**, not later: it is the one input the LLM layer cannot be built without agreeing.
 
-**Everything Stage 5 needs is settled — but four things were settled _after_ this file was first
-written, and they are in §16 of `docs/DECISIONS.md` rather than above.** Read ADR-095 to ADR-099
-before starting Stage 5. In short: the pg-boss pooler test ships skipped and R7 stays open (095);
-CSV and XLSX land in Stage 5 and vCard does not (096); duplicates inside a single file get their own
-row pointer in migration 0009 (097); **the session split below changed** — Session A owns §6.8
-entire, including duplicate detection, and the acceptance test's numbers were wrong (098); and the
-fuzzy name threshold was measured and moved, with candidate generation split from scoring (099).
+**Q4 is answered and built** (Simon, 2026-09-04): a flagged duplicate is not silently pre-decided.
+The row is flagged and the user asked in as many words — _"this looks like a contact you already
+have: do you really want to import it?"_ — with **not importing** as the default. The Review grid
+words the two kinds of duplicate differently, because "you already have this contact" and "this file
+lists this person twice" are different problems.
 
-**Q4** (Simon, 2026-09-04): a near-certain duplicate is **not** silently pre-decided.
-The row is flagged and the user is asked in as many words — _"this looks like a contact you already
-have: do you really want to import it?"_ — with **not importing** as the default. That is option (a)
-of §14 plus an explicit prompt rather than a silent skip. **Q6 is answered** too: ADR-093, built.
+**Three small things worth knowing, none blocking:**
 
-**Two small things found by Simon clicking around, neither blocking:**
-
-- **Fixed, but without a regression test.** A popover opened inside a dialog could not be scrolled
-  with the wheel: Radix's Dialog locks scrolling with `react-remove-scroll`, which allows wheel
-  events only inside its own subtree, and every popover portalled to `document.body`. Dialogs now
-  publish their content node (`useDialogContainer`) and the four portalling popovers render into it.
-  A spec was attempted and abandoned because the Type control has no stable accessible name — see
-  the next point. **Worth writing once that is fixed.**
-- **The Type and Group controls are buttons with no programmatic label.** `FieldRow` renders a
-  `<label for>`, which names form controls and not buttons, so their accessible name is their
-  current _value_ ("Short text") rather than "Type". Harmless on screen, wrong for a screen reader,
-  and it is what made the regression test above brittle.
+- **A popover inside a dialog was fixed without a regression test.** Radix's Dialog locks scrolling
+  with `react-remove-scroll`; dialogs now publish their content node (`useDialogContainer`) and the
+  four portalling popovers render into it. The spec was abandoned because the Type control has no
+  stable accessible name — see the next point. **Worth writing once that is fixed.**
+- **The Type and Group controls in the attribute editor are buttons with no programmatic label.**
+  `FieldRow` renders a `<label for>`, which names form controls and not buttons, so their accessible
+  name is their current _value_ ("Short text") rather than "Type". Harmless on screen, wrong for a
+  screen reader, and it is what made the regression test above brittle. Ten minutes.
+- **Apple Contacts vCard is deferred** (ADR-096) and shows in the wizard's dropdown disabled. It is
+  not merely unbuilt work: a vCard is a stream of records with repeating typed fields rather than a
+  grid, so §6.8's one-card-per-column mapping UI has no obvious meaning for it.
 
 ## Documents that are part of every stage's definition of done
 
@@ -131,93 +141,68 @@ pnpm verify                   # what CI runs
 ```bash
 pnpm --filter @mutuals/e2e exec playwright install chromium   # once, ~95 MB
 pnpm verify:e2e               # build, migrate mutuals_e2e, Playwright
-pnpm verify:full              # verify + verify:e2e
+pnpm verify:full              # ...all three
 ```
 
 Traps that already cost time once each, all now guarded but worth knowing:
 
 - **`localhost` resolves to `::1` here, and half the tooling polls `127.0.0.1`.** Two servers can
   both "succeed" on port 3000 — one on IPv6, one on IPv4 — and neither errors. This is why
-  `vite.config.ts`'s `preview` block binds `127.0.0.1` explicitly, and it is the first thing to
-  suspect whenever something is listening and nothing can reach it.
+  `vite.config.ts`'s `preview` block binds `127.0.0.1` explicitly.
 - **`process.loadEnvFile` and `--env-file` do not override a variable already in the environment.**
-  A wrapper that exports `PORT` wins over `.env` silently, and the API ends up on the wrong port.
 - **`vite build` ships React's development JSX runtime** unless `NODE_ENV=production` is set _before_
-  Vite is imported. Not from Vite's build mode, not from the config function — the plugin reads it at
-  import time. `apps/web/scripts/build.mjs` handles it and asserts its own output.
+  Vite is imported. `apps/web/scripts/build.mjs` handles it and asserts its own output.
 - **`pnpm db:check`** generates 10,000 contacts × 60 attributes and takes about 80 seconds. It is the
   performance harness, not part of `verify`.
-- **`page.clock` pins the browser's clock only.** The API keeps its own, so anything the server
-  derives — a follow-up's `state`, the date of a recurrence's next occurrence — is still computed
-  against the real today. Asserting a literal server-derived date in an e2e spec asserts what day
-  the machine thinks it is. ADR-091 has the corrected version; a test found this the hard way.
-- **A view's snapshot is the _effective_ columns, not the URL's.** The URL omits `columns` while the
-  table shows its defaults, so reading it straight saves a view with no columns that is dirty the
-  instant it is created. ADR-094 has the detail; it is the kind of thing that looks fine until a
-  test asserts it.
-- **Radix tabs and popovers do not respond to synthetic `.click()`.** Driving the app through
-  `javascript_tool` will silently fail on them; Playwright sends real pointer events and does not.
-  Verify anything tab- or popover-shaped through the e2e suite rather than through the dev console.
+- **`page.clock` pins the browser's clock only.** Anything the server derives is still computed
+  against the real today. ADR-091 has the corrected version.
+- **A view's snapshot is the _effective_ columns, not the URL's.** ADR-094 has the detail.
+- **Radix tabs, menus and popovers do not respond to synthetic `.click()`.** Driving the app through
+  `javascript_tool` silently fails on them; Playwright sends real pointer events and does not. The
+  merge spec is the one that proves this — its `⋯` menu opens nowhere else.
+- **`pg` serialises a JS array as a Postgres array literal, not as JSON.** Every jsonb write goes
+  through `JSON.stringify`, which is what `views.ts` and `imports.ts` both do.
+- **`jsonb_set` creates only the _last_ element of its path.** Writing `{edits, 3}` on a row with no
+  `edits` key returns the row unchanged — no error, and an `UPDATE … RETURNING` reporting success.
+  Cost an hour in Stage 5; only an assertion on the resulting value found it.
 
 ## The next step, verbatim
 
 Paste this as the first message of the new session:
 
-> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §6.8, §6.9 and §4.6, then
-> `docs/DECISIONS.md` **§16** — ADR-095 to ADR-099, settled after this file was first written,
-> and they change the split below and the acceptance test's numbers.
+> Read `CLAUDE.md`, then `docs/HANDOFF.md`, then `docs/BRIEF.md` §4.8, §6.1, §6.5, §6.10 and §9, and
+> `docs/DECISIONS.md` §7 (the LLM ADRs, 064 to 072) plus §16.
 >
-> Build **Stage 5 — the import wizard, duplicate detection and merge**. It is the largest stage left
-> and splits cleanly in two; do the first half, stop, and report.
+> Build **Stage 6 — the LLM layer and the command palette**. It splits in two; do the first half,
+> stop, and report.
 >
-> **Session A — §6.8 entire (ADR-098).** The brief's five steps, in the brief's own words:
-> **Upload → Sheet → Map columns → Review → Done**. Not the four-step paraphrase an earlier version
-> of this file gave; step 2 is sheet selection and step 4 is the editable grid _plus_ duplicate
-> detection. Duplicate detection is Session A's, not Session B's — ADR-098 says why, and it is what
-> makes the acceptance test runnable at the end of A.
+> **Ask Q7 in your first reply and wait for the answer.** `LLM_DAILY_COST_LIMIT_USD` defaults to
+> $2.00/day and nobody has confirmed it. It is the one input this stage cannot be built without
+> agreeing, and `docs/DECISIONS.md` §14 has the framing. Everything else Stage 6 needs is settled.
 >
-> `import_batch` and `import_row` exist from migration 0005 and nothing has touched them; ADR-097
-> adds `duplicate_of_row` to `import_row` in migration **0009** (0006 to 0008 are taken). `PLANNED_OPERATIONS` holds **eleven**
-> reserved names: eight for the import (`createImportBatch` … `getImportErrorReport`) and three for
-> merge (`mergeContacts`, `previewMergeContacts`, `mergeOrganizations`), which belong to session B.
-> Move them into `OPERATIONS` as you implement them rather than inventing names —
-> `operations.test.ts` asserts the two arrays stay disjoint, so a name in both fails the build.
+> **Session A — the LLM module and `ask`.** The provider client, the prompt registry, the cost cap,
+> the `llm_call` audit table (migration 0006, untouched since Stage 1) and §4.8's "ask the network":
+> a natural-language question becomes a **structured filter over the existing API**, runs, and the
+> answer shows _which filter it ran_ so the user can trust or correct it. `search`, `ask` and
+> `quickCapture` are already registered and answer 501 with their real request and response shapes
+> in `docs/openapi.json` — fill them in rather than inventing new operations. ADR-064 to ADR-072
+> cover the module; ADR-068's replayable trace is a Postgres table and its fixtures are files.
 >
-> Formats are **CSV and XLSX only** (ADR-096): `exceljs`, streaming, and a committed generator for
-> the multi-sheet fixture. vCard's dropdown entry ships disabled with a reason.
-> `fixtures/linkedin_connections_sample.csv` and `google_contacts_sample.csv` are the CSV fixtures,
-> and the LinkedIn one has three preamble lines before its header on purpose.
+> **Session B — quick capture, summaries and the palette.** §4.8's quick capture (free text in, an
+> editable preview of contact + organization + interaction + follow-up out, nothing saved before
+> confirmation), §6.5's on-demand summary, and §6.10's ⌘K command palette over §4.8's global search.
+> Quick capture matches people through the **same** `matchDuplicates` the importer uses — ADR-099
+> moved its thresholds in Stage 5 and quick capture inherits them, which is intended.
 >
-> Three things Session A needs that do not exist yet and are easy to miss: the **database half of
-> duplicate matching** (`matchDuplicates` lives in `packages/core` with no SQL behind it — batch the
-> identifier probes, ADR-042), **find-or-create for organizations** (nothing in
-> `packages/db/src/write/` does it, and the LinkedIn preset needs it to link with `title = Position`
-> and `from = Connected On`), and **`apps/worker`** (ADR-062: created in Stage 5, not before).
->
-> **Session B — merge, and merge only (ADR-098).** §4.6's identity matching already exists and is
-> unit-tested in `packages/core`, and Session A built the SQL behind it: exact on a normalised
-> identifier is near-certain, name similarity is only ever the fallback. §6.9's merge UI is the new
-> part. **Q4 is already answered — do not ask it again:**
-> a near-certain duplicate is flagged and the user is asked in as many words ("this looks like a
-> contact you already have — do you really want to import it?"), with _not importing_ as the
-> default. Same outcome as §14's option (a), but stated as a question so the person sees why the row
-> did not land. `docs/DECISIONS.md` §14 has it verbatim.
->
-> **`e2e/specs/import-linkedin-csv.spec.ts` is the acceptance test**, it is written as `fixme`, and
-> **its numbers are wrong** — ADR-098 has the measurement. It claims 6 data rows and two collisions;
-> the fixture holds **31 data rows, six duplicate pairs and one error row**, so **24 contacts land**
-> when every flagged row is skipped. Its comment also mis-classifies the Håkansson pair as fuzzy
-> when the two rows share a `linkedin_url` exactly, and it assumes the exact duplicate is
-> preselected to merge, which Q4 overruled. Rewrite it against ADR-098's table rather than
-> un-`fixme`-ing it, and it becomes green at the end of Session A, not Session B.
+> The LLM extracts and code decides (§4.8). Nothing the model returns is written without validation,
+> and nothing is written at all before the user confirms it.
 >
 > Everything goes on `version/claude-v1` and therefore into PR #1 (ADR-089). **Still do not merge it.**
 >
 > **Closing the stage**, after session B and not before: `docs/PLAN.md`'s stage table, `CLAUDE.md`'s
-> stage marker, `README.md`'s status and ADR count, `docs/HANDOFF.md` rewritten for Stage 6 — then
-> retitle PR #1 and rewrite its body to cover Stages 1–5, keeping the "Scope note" block at the top.
-> Session A ends with green CI — `pnpm verify:full`, the rewritten acceptance test included — and
-> commits pushed, and leaves the stage markers alone.
+> stage marker, `README.md`'s status and ADR count, `docs/HANDOFF.md` rewritten for Stage 7 — then
+> retitle PR #1 and rewrite its body to cover Stages 1–6, keeping the "Scope note" block at the top.
+> Session A ends with green CI and commits pushed, and leaves the stage markers alone.
 >
 > Verify by running things, not by reading them. `pnpm verify:full` is the gate. Report back in the
 > two layers §0 requires, and stop for approval.
@@ -235,9 +220,10 @@ whichever language he last used. This does **not** change CLAUDE.md's rule that 
 English throughout — code, comments, docs, commit messages and UI stay English no matter what
 language the conversation is in. The technical layer is for his co-founder and stays English.
 
-He is also worth arguing with productively: twice he pushed back on something ("does that make the
-app slow?", "are you sure the handover is complete?") and was right both times — the first forced a
-measurement, the second found six errors in this file.
+He is also worth arguing with productively: three times now he has pushed back on something ("does
+that make the app slow?", "are you sure the handover is complete?", "how much is left?") and been
+right each time — the first forced a measurement, the second found six errors in this file, the
+third produced an honest split of what was done from what was not.
 
 **His co-founder** is a senior engineer who reviews architecture. Give him the trade-off, the thing
 you are unsure about, and what would falsify the decision.
@@ -248,8 +234,15 @@ simplest option and add an ADR; large or hard to reverse, stop and ask.
 ## One habit worth keeping
 
 Everything good in this repo came from checking rather than trusting. The projection-equivalence gate
-found a real bug on its first run. The schema drift test was _proved_ to fail before it was believed.
-The performance harness turned "deleting a contact is fast" into "deleting a contact took 4.0
-seconds" and then into 1.03 ms. The contrast test found a grey that was unreadable on grey.
+found a real bug on its first run. The performance harness turned "deleting a contact is fast" into
+"deleting a contact took 4.0 seconds" and then into 1.03 ms. The contrast test found a grey that was
+unreadable on grey.
+
+Stage 5 is the clearest case so far. Reading the handover against the code found four errors in it
+before a line was written — including an acceptance test whose every number was wrong. Measuring the
+matching threshold against real name pairs found three duplicates the old setting could not detect.
+And of the bugs the build itself produced, **three were completely silent**: a `jsonb_set` that
+reported success and did nothing, a test double that modelled a queue wrongly and deadlocked, and a
+hard-coded empty array that disabled two matching rules without failing anything.
 
 None of those were found by reading code. Keep running the thing.

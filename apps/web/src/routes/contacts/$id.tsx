@@ -18,6 +18,7 @@ import { Section } from '@/components/app-shell/page.tsx'
 import { ConfirmDialog } from '@/ui/confirm-dialog.tsx'
 import { AttributeSidebar } from '@/features/records/detail/attribute-sidebar.tsx'
 import { ConnectionsTab } from '@/features/records/detail/connections-tab.tsx'
+import { MergeDialog } from '@/features/merge/merge-dialog.tsx'
 import { RecordHeader } from '@/features/records/detail/record-header.tsx'
 import { FollowUpDialog } from '@/features/follow-ups/follow-up-dialog.tsx'
 import { FollowUpList } from '@/features/follow-ups/follow-up-list.tsx'
@@ -59,6 +60,7 @@ function ContactDetailPage() {
   const editor = useRecordEdit('contact')
   const remove = useDeleteRecords('contact')
   const [confirming, setConfirming] = useState(false)
+  const [merging, setMerging] = useState(false)
 
   const bySlug = useMemo(
     () => new Map((definitions.data ?? []).map((definition) => [definition.slug, definition])),
@@ -86,6 +88,9 @@ function ContactDetailPage() {
             context={<ContactContext row={row} />}
             onDelete={() => {
               setConfirming(true)
+            }}
+            onMerge={() => {
+              setMerging(true)
             }}
           />
 
@@ -128,6 +133,13 @@ function ContactDetailPage() {
           editor={editor}
         />
       </div>
+      <MergeDialog
+        open={merging}
+        onOpenChange={setMerging}
+        objectType="contact"
+        survivorId={row.id}
+        survivorLabel={row.displayName}
+      />
 
       <ConfirmDialog
         open={confirming}

@@ -30,6 +30,7 @@ import { attributeDefinitionRoutes } from './routes/attribute-definitions.ts'
 import { contactRoutes } from './routes/contacts.ts'
 import { followUpRoutes } from './routes/follow-ups.ts'
 import { importBatchRoutes } from './routes/import-batches.ts'
+import { mergeRoutes } from './routes/merge.ts'
 import { interactionRoutes } from './routes/interactions.ts'
 import { organizationRoutes } from './routes/organizations.ts'
 import { recordRoutes } from './routes/records.ts'
@@ -175,6 +176,7 @@ export async function buildApp(ctx: AppContext, options: BuildOptions = {}): Pro
       await instance.register(interactionRoutes, { ctx })
       await instance.register(followUpRoutes, { ctx })
       await instance.register(importBatchRoutes, { ctx })
+      await instance.register(mergeRoutes, { ctx })
       await instance.register(attributeDefinitionRoutes, { ctx })
       await instance.register(settingsRoutes, { ctx })
       await instance.register(viewRoutes, { ctx })

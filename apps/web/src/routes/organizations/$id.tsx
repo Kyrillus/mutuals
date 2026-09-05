@@ -14,6 +14,7 @@ import { DisplayProvider } from '@/attributes/display-context.tsx'
 import { prettyUrl } from '@/attributes/format.ts'
 import { InteractionTimeline } from '@/features/interactions/interaction-timeline.tsx'
 import { AttributeSidebar } from '@/features/records/detail/attribute-sidebar.tsx'
+import { MergeDialog } from '@/features/merge/merge-dialog.tsx'
 import { RecordHeader } from '@/features/records/detail/record-header.tsx'
 import { useAttributeDefinitions } from '@/features/records/use-attribute-definitions.ts'
 import { useOrganization } from '@/features/records/use-record.ts'
@@ -46,6 +47,7 @@ function OrganizationDetailPage() {
   const editor = useRecordEdit('organization')
   const remove = useDeleteRecords('organization')
   const [confirming, setConfirming] = useState(false)
+  const [merging, setMerging] = useState(false)
 
   const bySlug = useMemo(
     () => new Map((definitions.data ?? []).map((definition) => [definition.slug, definition])),
@@ -75,6 +77,9 @@ function OrganizationDetailPage() {
             provenance={row.provenance}
             onDelete={() => {
               setConfirming(true)
+            }}
+            onMerge={() => {
+              setMerging(true)
             }}
             context={
               <>
@@ -127,6 +132,13 @@ function OrganizationDetailPage() {
           editor={editor}
         />
       </div>
+      <MergeDialog
+        open={merging}
+        onOpenChange={setMerging}
+        objectType="organization"
+        survivorId={row.id}
+        survivorLabel={row.displayName}
+      />
 
       <ConfirmDialog
         open={confirming}

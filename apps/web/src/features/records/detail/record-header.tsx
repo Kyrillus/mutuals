@@ -4,7 +4,7 @@
  * The context line is assembled from whatever the record actually has. A contact with no
  * organization and no city gets a shorter line, not an empty one with separators in it.
  */
-import { MoreHorizontal, Trash2 } from 'lucide-react'
+import { Merge, MoreHorizontal, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { formatDateTime } from '@/attributes/format.ts'
@@ -32,6 +32,7 @@ export function RecordHeader({
   context,
   actions,
   onDelete,
+  onMerge,
 }: {
   displayName: string
   provenance: { createdVia: string; createdAt: string }
@@ -39,6 +40,8 @@ export function RecordHeader({
   context?: ReactNode
   actions?: ReactNode
   onDelete: () => void
+  /** §6.9. Opens the side-by-side; the record in the header is always the survivor. */
+  onMerge: () => void
 }) {
   const { locale, timeZone } = useDisplay()
 
@@ -71,9 +74,12 @@ export function RecordHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {/* Merge is §6.9, Stage 5. Shown disabled rather than hidden so the menu does not grow
-                an item later and move the one people have already learnt. */}
-            <DropdownMenuItem disabled>Merge into another record…</DropdownMenuItem>
+            {/* Shown disabled from Stage 3 so the menu would not grow an item later and move the
+                one people had already learnt. Stage 5 enabled it in place (§6.9). */}
+            <DropdownMenuItem onSelect={onMerge}>
+              <Merge />
+              Merge into this one…
+            </DropdownMenuItem>
             <DropdownMenuItem variant="destructive" onSelect={onDelete}>
               <Trash2 />
               Delete

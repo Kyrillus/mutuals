@@ -31,6 +31,7 @@ export * from './filter/sort.ts'
 // The write path. Every mutation goes through these; nothing writes `attribute_value` by hand.
 export * from './write/facts.ts'
 export * from './write/identifiers.ts'
+export * from './write/merge.ts'
 export * from './write/organizations.ts'
 export * from './write/records.ts'
 export * from './write/value-key.ts'

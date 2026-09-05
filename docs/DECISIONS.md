@@ -3128,3 +3128,50 @@ Sheet step cannot be passed by taking `sheets[0]`. And the Review banner counts 
 naming their kind: a batch can hold both, and on a first import into an empty workspace every one of
 them is a repeat inside the file, so "people you already have" would be plainly wrong on the
 commonest path. The per-row question says which kind it is; the banner only counts.
+
+### ADR-101 — Merge moves the loser's facts; the database decides what is possible
+
+**Context.** §6.9: two records become one, the user chooses per field, interactions and follow-ups
+move, the other record is deleted. The obvious implementation writes the chosen values onto the
+survivor and deletes the loser.
+
+**Options.** (1) Write the chosen values on the survivor, delete the loser and let the cascade take
+its facts. (2) Move every fact to the survivor, superseding whichever side loses each contested
+field.
+
+**Choice.** Option 2.
+
+**Consequences.** Option 1 destroys the log. `fact` is the truth and `attribute_value` is only its
+projection (§4.5), so deleting the loser's facts deletes every observation ever made about a person
+the user has just asserted is the same person — including the provenance that makes §4.5's history
+popover worth having. Moving them means the survivor can say "Company: Stripe — since Jun 2025, from
+LinkedIn import" about a record that no longer exists, which is truthful: there was only ever one
+person.
+
+**The ordering is not arbitrary, and the database enforces it.** `fact_live_uq` is unique on
+`(record_id, attribute_id, value_key)` where `superseded_by_id IS NULL`, so two live values for one
+field are _impossible_ rather than merely unintended — every conflict has to be superseded before
+the move, and a merge that got this wrong would fail loudly instead of silently producing a contact
+with two emails. Crucially the index constrains **live** rows only, which is exactly what lets the
+superseded history move freely. `rl_no_self` and `rl_uq` play the same role for links: a link
+between the two records being merged is superseded rather than repointed, because after the merge
+the relationship has no two ends; and a third record linked to both keeps the survivor's link.
+
+Two details that are easy to get wrong and are both load-bearing. A multi-valued relation's
+`value_key` **is** its target id (`value-key.ts`), so repointing `target_record_id` has to carry the
+key with it or the index and the projector disagree about which slot a link occupies — the kind of
+divergence the projection-equivalence gate finds a week later. And a merge is a _set_ union for
+multi-valued attributes: two records' tags combine, and the side-by-side deliberately offers no
+radio there, because asking which of two tag lists to keep throws away the half the user did not
+click.
+
+**`mergeOrganizations` ships now rather than in Stage 6**, which §6.9 permits but does not require.
+Session A created the need: `resolveOrganizations` matches company names _exactly_ and never
+fuzzily, on purpose — the pairs a fuzzy rule would join are the ones a person would keep apart, so
+"Kiln Robotics" and "Kiln Robotics GmbH" are two records by design. This operation is the remedy that
+asymmetry always assumed, and shipping the importer without it would have left it with none.
+
+**`PLANNED_OPERATIONS` is now empty.** Every name ADR-031 enumerated in Stage 1 is registered, and
+the only one added along the way is the ninth import operation ADR-098 records. The array stays,
+because the test that keeps it disjoint from `OPERATIONS` is the guard that made the list worth
+keeping.

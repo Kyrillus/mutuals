@@ -1,10 +1,10 @@
 # Mutuals — Implementation Plan (Stage 0)
 
-**Status:** approved. **Stages 1–4 are complete** — see §5 for what Stage 1's definition of done
-actually measured, ADR-087/088 for Stage 2's closing section, ADR-090/091/092 for Stage 3, and
-ADR-093/094 for Stage 4. Stage 5 has not started.
+**Status:** approved. **Stages 1–5 are complete** — see §5 for what Stage 1's definition of done
+actually measured, ADR-087/088 for Stage 2's closing section, ADR-090/091/092 for Stage 3,
+ADR-093/094 for Stage 4, and §16 (ADR-095 to ADR-101) for Stage 5. Stage 6 has not started.
 **Branch:** `version/claude-v1`. **Source of truth for product decisions:** [`BRIEF.md`](./BRIEF.md).
-**Decision log:** [`DECISIONS.md`](./DECISIONS.md) — 94 ADRs. **Rejected designs:** `adr-archive/`.
+**Decision log:** [`DECISIONS.md`](./DECISIONS.md) — 101 ADRs. **Rejected designs:** `adr-archive/`.
 
 This plan has the two layers the brief asks for in §0. Layer 1 is for Simon and contains no code and
 no file paths. Layer 2 is for the co-founder.
@@ -229,8 +229,11 @@ Ranked, each with what would falsify it. Full text in `DECISIONS.md` §13.
    escape hatch (two-phase index-ordered pagination) is a **query** change, not a schema change.
 2. **The projection can silently diverge from the fact log.** _Falsifier:_ the per-record digest gate,
    run as the last integration test.
-3. **A 10k-row import is the peak write event and the least-tested path.** _Falsifier:_ the Stage 5
-   double-import acceptance test.
+3. ~~**A 10k-row import is the peak write event and the least-tested path.**~~ **Closed in Stage 5.**
+   The importer commits in chunks of 200, each in its own transaction, advancing
+   `import_batch.last_committed_row` so a failure is resumable rather than replayable (ADR-061). The
+   acceptance test imports the LinkedIn fixture end to end and then imports it a second time, which
+   creates nothing — §6.8's idempotency requirement, measured rather than argued.
 4. **TanStack Table v9 is one month old.** Pinned because shadcn's mandated pattern is written against
    it. _Fallback:_ v8 plus a hand-ported data-table, about a day, no architecture change.
 5. **Attribute values are not typed end-to-end and cannot be** — runtime typing comes from Zod
