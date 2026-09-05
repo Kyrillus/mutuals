@@ -63,4 +63,11 @@ export const qk = {
   followUpList: (query: Readonly<Record<string, unknown>>) => ['follow-ups', query] as const,
   /** §6.6's saved views, per object type. */
   views: (objectType: string) => ['views', objectType] as const,
+  /**
+   * §6.8's wizard. Keyed by the row query too, because the Review grid's two tabs and its paging
+   * are separate reads of the same batch and must not evict each other.
+   */
+  importBatch: (id: string) => ['import-batch', id] as const,
+  importBatchRows: (id: string, query: Readonly<Record<string, unknown>>) =>
+    ['import-batch', id, query] as const,
 }

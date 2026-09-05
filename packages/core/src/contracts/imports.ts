@@ -172,6 +172,8 @@ export const ImportBatchDetailSchema = z.object({
   rows: z.array(ImportRowSchema),
 })
 
+export type ImportBatchDetail = z.output<typeof ImportBatchDetailSchema>
+
 export const ImportRowsQuerySchema = z.object({
   /** §6.8 step 4's two tabs. */
   onlyErrors: z.stringbool().optional(),

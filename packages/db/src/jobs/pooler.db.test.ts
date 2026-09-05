@@ -36,6 +36,9 @@ afterAll(async () => {
   await queue?.stop()
 })
 
+/** A managed database over the network needs more than a local socket does. */
+const TIMEOUT_MS = 120_000
+
 const CONFIGURED = POOLER_URL !== undefined && POOLER_URL !== ''
 
 /**
@@ -51,31 +54,35 @@ const SUITE = CONFIGURED
   : 'pg-boss through a transaction pooler [R7 UNVERIFIED — set POOLER_DATABASE_URL to measure it]'
 
 describePooler(SUITE, () => {
-  it('migrates, enqueues, works and stops over a pooled connection', async () => {
-    queue = new PgBossQueue({
-      connectionString: POOLER_URL as string,
-      schema: SCHEMA,
-      pollingIntervalSeconds: 1,
-      enableJobSpies: true,
-    })
+  it(
+    'migrates, enqueues, works and stops over a pooled connection',
+    async () => {
+      queue = new PgBossQueue({
+        connectionString: POOLER_URL as string,
+        schema: SCHEMA,
+        pollingIntervalSeconds: 1,
+        enableJobSpies: true,
+      })
 
-    // Each of these is a statement that would fail if pg-boss depended on session state: the
-    // schema migration is DDL, `createQueue` writes catalog rows, and the worker polls.
-    await queue.start()
+      // Each of these is a statement that would fail if pg-boss depended on session state: the
+      // schema migration is DDL, `createQueue` writes catalog rows, and the worker polls.
+      await queue.start()
 
-    const handled: string[] = []
-    await queue.work<ImportRunPayload>('import.run', (job) => {
-      handled.push(job.data.batchId)
-      return Promise.resolve()
-    })
+      const handled: string[] = []
+      await queue.work<ImportRunPayload>('import.run', (job) => {
+        handled.push(job.data.batchId)
+        return Promise.resolve()
+      })
 
-    const spy = queue.spy<ImportRunPayload>('import.run')
-    const id = await queue.send('import.run', { batchId: 'pooler-check' })
-    expect(id).not.toBeNull()
+      const spy = queue.spy<ImportRunPayload>('import.run')
+      const id = await queue.send('import.run', { batchId: 'pooler-check' })
+      expect(id).not.toBeNull()
 
-    await spy.waitForJobWithId(id as string, 'completed')
-    expect(handled).toEqual(['pooler-check'])
-  }, // A managed database over the network is not a local socket, and the schema migration on a
-  // first run is the slow part.
-  120_000)
+      await spy.waitForJobWithId(id as string, 'completed')
+      expect(handled).toEqual(['pooler-check'])
+    },
+    // A managed database over the network is not a local socket, and pg-boss migrating its own
+    // schema on a first run is the slow part.
+    TIMEOUT_MS,
+  )
 })

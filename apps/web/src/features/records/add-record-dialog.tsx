@@ -1,4 +1,5 @@
 import { fieldValueKind, type AttributeDefinitionDto, type FieldDescriptor } from '@mutuals/core'
+import { Link } from '@tanstack/react-router'
 import { ChevronDown, Plus } from 'lucide-react'
 import { useMemo, useRef, useState, type RefObject } from 'react'
 
@@ -34,8 +35,8 @@ const DEFAULT_GROUP = 'Details'
 /**
  * §5.2's primary action: a split button, `+ Add new` beside a chevron.
  *
- * Bulk import is Stage 5 (§6.8) and is shown disabled rather than hidden, so the menu does not
- * grow an item later and move the one people have already learnt.
+ * Bulk import was shown disabled from Stage 2 so the menu would not grow an item later and move
+ * the one people had already learnt. Stage 5 enabled it in place.
  */
 export function AddRecordButton({
   objectType,
@@ -85,7 +86,11 @@ export function AddRecordButton({
             >
               Add single {label}
             </DropdownMenuItem>
-            <DropdownMenuItem disabled>Bulk import {label}s</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/import" search={{ objectType }}>
+                Bulk import {label}s
+              </Link>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

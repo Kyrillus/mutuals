@@ -692,7 +692,16 @@ export async function loadBatchDetail(
 
 function toRowDto(row: ImportRowRecord, config: WizardConfig) {
   const cells = cellsOf(row)
-  const detail = row.duplicateDetail as Record<string, unknown> | null
+  /**
+   * A detail is only rendered when a pointer survives to explain.
+   *
+   * Deleting a contact nulls `duplicate_of` (`ON DELETE SET NULL`, migration 0005) and leaves the
+   * detail behind — so without this the grid would show "possible duplicate of Anna Berger" for a
+   * contact that no longer exists. Migration 0010 removed the CHECK that tried to prevent the
+   * orphan, because it prevented the *delete* instead.
+   */
+  const hasPointer = row.duplicateOf !== null || row.duplicateOfRow !== null
+  const detail = hasPointer ? (row.duplicateDetail as Record<string, unknown> | null) : null
   return {
     rowNumber: row.rowNumber,
     raw: Object.fromEntries(config.header.map((header, index) => [header, cells[index] ?? ''])),

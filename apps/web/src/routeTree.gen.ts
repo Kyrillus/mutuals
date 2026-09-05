@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ContactsRouteRouteImport } from './routes/contacts/route'
 import { Route as FollowUpsRouteImport } from './routes/follow-ups'
+import { Route as ImportRouteImport } from './routes/import'
 import { Route as OrganizationsRouteRouteImport } from './routes/organizations/route'
 import { Route as SettingsRouteRouteImport } from './routes/settings/route'
 import { Route as ContactsIndexRouteImport } from './routes/contacts/index'
@@ -42,6 +43,11 @@ const ContactsRouteRoute = ContactsRouteRouteImport.update({
 const FollowUpsRoute = FollowUpsRouteImport.update({
   id: '/follow-ups',
   path: '/follow-ups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportRoute = ImportRouteImport.update({
+  id: '/import',
+  path: '/import',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrganizationsRouteRoute = OrganizationsRouteRouteImport.update({
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/organizations': typeof OrganizationsRouteRouteWithChildren
   '/settings': typeof SettingsRouteRouteWithChildren
   '/follow-ups': typeof FollowUpsRoute
+  '/import': typeof ImportRoute
   '/settings/contacts': typeof SettingsContactsRouteRouteWithChildren
   '/settings/organizations': typeof SettingsOrganizationsRouteRouteWithChildren
   '/contacts/$id': typeof ContactsIdRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/follow-ups': typeof FollowUpsRoute
+  '/import': typeof ImportRoute
   '/contacts/$id': typeof ContactsIdRoute
   '/organizations/$id': typeof OrganizationsIdRoute
   '/settings/profile': typeof SettingsProfileRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/organizations': typeof OrganizationsRouteRouteWithChildren
   '/settings': typeof SettingsRouteRouteWithChildren
   '/follow-ups': typeof FollowUpsRoute
+  '/import': typeof ImportRoute
   '/settings/contacts': typeof SettingsContactsRouteRouteWithChildren
   '/settings/organizations': typeof SettingsOrganizationsRouteRouteWithChildren
   '/contacts/$id': typeof ContactsIdRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/settings'
     | '/follow-ups'
+    | '/import'
     | '/settings/contacts'
     | '/settings/organizations'
     | '/contacts/$id'
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/follow-ups'
+    | '/import'
     | '/contacts/$id'
     | '/organizations/$id'
     | '/settings/profile'
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/settings'
     | '/follow-ups'
+    | '/import'
     | '/settings/contacts'
     | '/settings/organizations'
     | '/contacts/$id'
@@ -256,6 +268,7 @@ export interface RootRouteChildren {
   OrganizationsRouteRoute: typeof OrganizationsRouteRouteWithChildren
   SettingsRouteRoute: typeof SettingsRouteRouteWithChildren
   FollowUpsRoute: typeof FollowUpsRoute
+  ImportRoute: typeof ImportRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -279,6 +292,13 @@ declare module '@tanstack/react-router' {
       path: '/follow-ups'
       fullPath: '/follow-ups'
       preLoaderRoute: typeof FollowUpsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/import': {
+      id: '/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof ImportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/organizations': {
@@ -482,6 +502,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrganizationsRouteRoute: OrganizationsRouteRouteWithChildren,
   SettingsRouteRoute: SettingsRouteRouteWithChildren,
   FollowUpsRoute: FollowUpsRoute,
+  ImportRoute: ImportRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
