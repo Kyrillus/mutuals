@@ -66,6 +66,34 @@ tell "planned" apart from "wrong URL".
 **500.** A bug. `detail` is generic on purpose; the specifics are in the server log with a matching
 request id.
 
+### llm_disabled
+
+**503.** The AI features (§4.8) cannot run here. Either `LLM_MODE=off`, or there is no
+`OPENROUTER_API_KEY` — a fresh checkout has neither and the rest of the app works fine without them.
+`detail` says which. This is not a failure to retry: something has to change in the configuration
+first.
+
+### llm_budget_exceeded
+
+**429.** `LLM_DAILY_COST_LIMIT_USD` has been reached for today (ADR-070, Q7 — $5.00). A circuit
+breaker rather than a budget: the same request will work after midnight in the profile's timezone,
+and nothing about it was wrong. `detail` carries the limit and what has been spent. The cap is
+checked immediately before **every** billable request to the model provider, including retries and
+the one repair round-trip, so a loop cannot bill six generations per user action.
+
+### llm_unavailable
+
+**504.** The model provider did not answer: unreachable, or past `LLM_TOTAL_TIMEOUT_MS`, or
+answering an error status three times. Retrying is reasonable. In `LLM_MODE=replay` this is also
+what a missing fixture returns, and `detail` then carries the command that records one.
+
+### llm_invalid_response
+
+**502.** The model provider answered, twice, with something that is not the shape it was asked for —
+once on the original request and once on the repair round-trip ADR-066 allows. The structured output
+was requested with `strict: true` and `provider.require_parameters`, so this means an endpoint that
+does not honour its own contract; the trace row in `llm_call` has the exact validation failures.
+
 ---
 
 ## Field codes

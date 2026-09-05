@@ -6,12 +6,15 @@
  * will list, not something approximately like it.
  */
 import {
+  LLM_STATS_DAYS,
+  LlmStatsSchema,
   ProfileSchema,
   StatsSchema,
   UpdateProfileSchema,
   addDays,
   type Profile,
 } from '@mutuals/core'
+import { llmSpend, llmSpentToday } from '@mutuals/db'
 
 import { loadSettings, workspaceId } from '../context.ts'
 import { ok200 } from '../http/schema.ts'
@@ -135,6 +138,50 @@ export const settingsRoutes = routePlugin((app, ctx) => {
       }
 
       return toProfile(await loadSettings(ctx))
+    },
+  )
+
+  /**
+   * What the LLM layer has cost (ADR-070).
+   *
+   * `llm_call` is an ordinary table and this is an ordinary read of it, which is why the route
+   * needs no exemption from ADR-071's import rule: nothing here can reach a model. The number that
+   * matters is `spentTodayUsd` against `limitUsd` — the circuit breaker, and whether it is close.
+   */
+  app.get(
+    '/stats/llm',
+    {
+      schema: {
+        operationId: 'getLlmStats',
+        tags: ['dashboard'],
+        summary: 'What the AI features have cost, per day, per task and per prompt version',
+        response: ok200(LlmStatsSchema),
+      },
+    },
+    async () => {
+      const settings = await loadSettings(ctx)
+      const now = ctx.now()
+      const since = new Date(`${addDays(settings.today, -LLM_STATS_DAYS)}T00:00:00Z`)
+      const availability = ctx.llm?.availability() ?? {
+        enabled: false,
+        mode: ctx.env.LLM_MODE,
+        reason: 'AI features are not configured on this server.',
+      }
+
+      const [spentTodayUsd, rows] = await Promise.all([
+        llmSpentToday(ctx.db, { now, timeZone: settings.timeZone }),
+        llmSpend(ctx.db, { since, timeZone: settings.timeZone }),
+      ])
+
+      return {
+        limitUsd: ctx.env.LLM_DAILY_COST_LIMIT_USD,
+        spentTodayUsd,
+        mode: availability.mode,
+        enabled: availability.enabled,
+        disabledReason: availability.reason,
+        today: settings.today,
+        rows: [...rows],
+      }
     },
   )
 })

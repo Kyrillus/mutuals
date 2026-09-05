@@ -50,9 +50,13 @@ describe('the middleware slot', () => {
 })
 
 describe('the Stage-6 operations', () => {
+  /**
+   * `ask` is built (§4.8) and has its own suite in `routes/ask.db.test.ts`. These two are the
+   * second half's, and they keep answering the documented 501 they have answered since Stage 1 —
+   * which is the point of ADR-031's list: the surface is reviewable before the engine is fitted.
+   */
   for (const [method, url, payload] of [
     ['GET', '/api/v1/search?q=anna', undefined],
-    ['POST', '/api/v1/ask', { question: 'who invests in climate tech?' }],
     ['POST', '/api/v1/quick-capture', { text: 'Met Anna at Bits & Pretzels' }],
   ] as const) {
     it(`answers a documented 501 for ${method} ${url}`, async () => {
@@ -70,8 +74,8 @@ describe('the Stage-6 operations', () => {
     })
   }
 
-  it('still validates the request before declining it', async () => {
-    // A client written today gets its schema errors today, not in Stage 6.
+  it('validates an ask before spending anything on it', async () => {
+    // A 400 from the schema, not a model call: an empty question costs nothing to refuse.
     const { status } = await api.post('/api/v1/ask', { question: '' })
     expect(status).toBe(400)
   })

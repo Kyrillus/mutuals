@@ -119,8 +119,13 @@ export type ImportStatus = (typeof IMPORT_STATUSES)[number]
 /** §6.8 step 4's per-row choice for a flagged duplicate. */
 export const IMPORT_DECISIONS = ['skip', 'merge', 'create'] as const
 export type ImportDecision = (typeof IMPORT_DECISIONS)[number]
-const LLM_TASK_KINDS = ['extraction', 'question', 'summary', 'embedding'] as const
-const LLM_STATUSES = [
+/**
+ * Migration 0006's three closed sets. Exported for the same reason `IMPORT_STATUSES` is: a
+ * stringly-typed `task_kind` lets a caller write "questions" and find out from a CHECK violation.
+ */
+export const LLM_TASK_KINDS = ['extraction', 'question', 'summary', 'embedding'] as const
+export type LlmTaskKind = (typeof LLM_TASK_KINDS)[number]
+export const LLM_STATUSES = [
   'ok',
   'invalid_json',
   'schema_error',
@@ -129,7 +134,9 @@ const LLM_STATUSES = [
   'budget_exceeded',
   'disabled',
 ] as const
-const LLM_COST_SOURCES = ['reported', 'unreported', 'free'] as const
+export type LlmCallStatus = (typeof LLM_STATUSES)[number]
+export const LLM_COST_SOURCES = ['reported', 'unreported', 'free'] as const
+export type LlmCostSource = (typeof LLM_COST_SOURCES)[number]
 
 /**
  * `[select, write]` for every physical type the migrations use. `numeric` is a string because

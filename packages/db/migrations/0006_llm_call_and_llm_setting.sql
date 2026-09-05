@@ -11,7 +11,11 @@ CREATE TABLE llm_call (
   task_kind         text NOT NULL CHECK (task_kind IN ('extraction','question','summary','embedding')),
   prompt_id         text NOT NULL,
   prompt_version    integer NOT NULL,
-  prompt_hash       text NOT NULL,          -- sha256 of the rendered messages
+  -- The prompt TEMPLATE hash: sha256 of the rendered *sample*, constant for a prompt version and
+  -- identical to the value in prompts.lock.json (ADR-068, corrected in ADR-108). Not the rendered
+  -- messages: that varies per call, subsumes input_hash, and makes the five-part replay key
+  -- incoherent -- every row would be its own key and nothing would ever replay.
+  prompt_hash       text NOT NULL,
   input_hash        text NOT NULL,          -- sha256 of canonicalJson(task input)
 
   -- who answered

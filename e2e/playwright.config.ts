@@ -16,6 +16,8 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 const WEB_PORT = Number(process.env.PREVIEW_PORT ?? 3200)
 const API_PORT = Number(process.env.API_PORT ?? 3201)
+/** The stand-in model provider (`support/model-stub.mjs`); 3202 for the same reason 3200/3201 are. */
+const MODEL_STUB_PORT = Number(process.env.MODEL_STUB_PORT ?? 3202)
 
 const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL ?? 'postgres://mutuals:mutuals@localhost:5432/mutuals_e2e'
@@ -51,6 +53,23 @@ export default defineConfig({
 
   webServer: [
     {
+      /**
+       * The model, faked one HTTP hop out (`support/model-stub.mjs`).
+       *
+       * Started before the API so `LLM_BASE_URL` resolves on the first question. Everything below
+       * the socket stays real: the transport, the strict `response_format`, the Zod re-validation,
+       * the filter compiler and the `llm_call` trace.
+       */
+      command: 'node support/model-stub.mjs',
+      cwd: fileURLToPath(new URL('.', import.meta.url)),
+      url: `http://127.0.0.1:${String(MODEL_STUB_PORT)}/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { MODEL_STUB_PORT: String(MODEL_STUB_PORT) },
+    },
+    {
       // The built API, the same artefact `pnpm start` runs in production — not `tsx src/main.ts`.
       command: 'pnpm start',
       cwd: ROOT,
@@ -64,6 +83,14 @@ export default defineConfig({
         DATABASE_URL: E2E_DATABASE_URL,
         NODE_ENV: 'production',
         LOG_LEVEL: 'warn',
+        // §4.8's routes, pointed at the stub. The key is required by `availability()` and is never
+        // sent anywhere real — the base URL is a loopback address.
+        LLM_MODE: 'live',
+        LLM_BASE_URL: `http://127.0.0.1:${String(MODEL_STUB_PORT)}`,
+        OPENROUTER_API_KEY: 'e2e-not-a-real-key',
+        // The cap is exercised by its own integration test. Leaving it on here would make the
+        // suite's greenness depend on how many questions previous specs happened to ask.
+        LLM_DAILY_COST_LIMIT_USD: '0',
       },
     },
     {

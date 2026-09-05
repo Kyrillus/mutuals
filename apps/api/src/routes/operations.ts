@@ -83,10 +83,14 @@ export const OPERATIONS = [
   'getStats',
   'getProfile',
   'updateProfile',
+  // Not in ADR-031's list. ADR-070 names it: a cost cap with no way to see what it is counting is
+  // a number nobody can check, and "a bug that loops spends someone's real money" is the whole
+  // reason the cap exists.
+  'getLlmStats',
 
-  // -- Stage 6: registered, documented, and answering 501 (§4.8) --------------------------------
-  'search',
+  // -- Stage 6 (§4.8). `ask` is built; the other two answer 501 until the second half ------------
   'ask',
+  'search',
   'quickCapture',
 ] as const
 
@@ -96,12 +100,16 @@ export type OperationId = (typeof OPERATIONS)[number]
  * ADR-031's remaining names, kept here so the complete surface stays reviewable while the routes
  * that implement them do not exist yet.
  *
- * **Empty as of Stage 5.** Every name ADR-031 enumerated in Stage 1 is now registered, and the only
- * one that was ever added along the way is recorded in ADR-098 rather than smuggled in. The array
- * stays — the test asserts it is disjoint from `OPERATIONS`, which is the guard that made this list
- * worth keeping, and Stage 6 will have names of its own to put here.
+ * **Empty again after Stage 6's first half.** `search` and `quickCapture` are *registered* rather
+ * than planned — they have been answering a documented 501 since Stage 1, which is the point of
+ * ADR-031's list: the surface is reviewable before the engine is fitted. The one name Stage 6's
+ * second half will add is §6.5's on-demand summary, and it goes here the moment its route exists
+ * rather than being remembered.
+ *
+ * The array stays because the test that keeps it disjoint from `OPERATIONS` is the guard that made
+ * this list worth keeping.
  */
-export const PLANNED_OPERATIONS = [] as const
+export const PLANNED_OPERATIONS = ['generateContactSummary'] as const
 
 export type PlannedOperationId = (typeof PLANNED_OPERATIONS)[number]
 

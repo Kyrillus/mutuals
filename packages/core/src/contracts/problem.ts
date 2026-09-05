@@ -23,6 +23,13 @@ export const PROBLEM_CODES = [
   'payload_too_large',
   'not_implemented',
   'internal_error',
+  // -- The LLM layer (§4.8, ADR-065, ADR-070). Four, because a client has four different things
+  // to do about them: tell the user the feature is switched off, tell them the day's budget is
+  // spent, offer a retry, or report a provider that is not honouring its own contract.
+  'llm_disabled',
+  'llm_budget_exceeded',
+  'llm_unavailable',
+  'llm_invalid_response',
 ] as const
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number]

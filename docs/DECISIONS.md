@@ -3183,3 +3183,218 @@ asymmetry always assumed, and shipping the importer without it would have left i
 the only one added along the way is the ninth import operation ADR-098 records. The array stays,
 because the test that keeps it disjoint from `OPERATIONS` is the guard that made the list worth
 keeping.
+
+## 17. Stage 6, first half — the LLM module and `ask`
+
+Six decisions the build made, plus the four bugs it found by running rather than by reading. None of
+them contradicts ADR-064 to ADR-072; five of them fill in something those ADRs left to the session
+that would fit the engine, and one of them corrects a claim in ADR-069 that no longer reproduces.
+
+### ADR-102 — `ask` answers with the object type, a nullable filter and a real total
+
+**Context.** `AskResponseSchema` has been on the wire since Stage 1 as `{ answer, filter, matches }`,
+which is what the handover means by "fill them in rather than inventing new operations". Rendering
+§6.1's answer against exactly that shape is not possible.
+
+**Options.** (1) Keep the shape and derive the missing parts in the client. (2) Add the three fields
+the shape cannot express. (3) A second, richer operation beside `ask`.
+
+**Choice.** Option 2. `objectType`, `total`, and `filter` becomes **nullable**.
+
+**Consequences.** Each addition closes a hole rather than adding a nicety. A bare
+`[{ field: 'city', … }]` does not say which table it belongs to, so the "Open as a table" link cannot
+be built and the chips cannot be linked — `objectType` is the minimum needed to make the answer
+clickable at all. `matches` is capped at `ASK_MATCH_LIMIT` (25), so without `total` the answer reads
+"25" when the truth is 340; the count is the number people will quote back at you and it has to be
+the real one. And **an empty filter array is a filter that matches everyone** — a perfectly good
+answer to "who do I know" — so a question that could not be turned into a filter has to be a
+different value rather than the same one. `null` says nothing ran; `[]` says everything matched.
+Option 3 was rejected on §7's own terms: two operations for one user action is exactly the "sequence
+of UI-only calls" the MCP-adapter claim rests on not happening.
+
+### ADR-103 — The model proposes a flat filter and never a count; two repair loops, two outcomes
+
+**Context.** ADR-066 settles _how_ structured output is requested and re-validated. It does not
+settle what the ask prompt's output should look like, nor what happens when the output is
+schema-valid and domain-invalid — a slug that is not a field, an operator the field does not offer.
+
+**Options.** (1) Emit `packages/core`'s discriminated `Filter` union directly. (2) A flat shape with
+every operator payload present and nullable, converted and validated by code. (3) Free text, parsed.
+
+**Choice.** Option 2, and **the model is never asked for a number**.
+
+**Consequences — the flat shape.** A strict structured output requires every property of every
+object in `required`, and a nine-variant union of operator shapes is precisely the construct
+providers refuse or degrade. Flat in, `parseFilterSet` out means core's validator — not the prompt —
+decides what a filter is. The output type has no attribute-id field and no record-id field, so
+ADR-067's compile-time guarantee holds: nothing the model returns is anything but a string the user
+could have typed.
+
+**Consequences — the count.** A model asked to write "I found 12 contacts" writes it _before_ the
+query has run, and will sometimes write 12 when the answer is 340 with nothing downstream able to
+tell which it did. So the model returns a noun phrase (`investors in Munich`) and `composeAnswer`
+writes the sentence around the real row count. The answer's numbers are therefore true by
+construction rather than by luck, which is the difference between a feature and a demo.
+
+**Consequences — two loops.** A **schema** failure is repaired inside `LlmClient` (ADR-066's one
+round-trip) and, twice failed, is a `502`: the provider is not honouring a contract it was asked to
+honour. A **domain** failure is repaired in `tasks/ask.ts` by asking again with the complaints
+attached and, twice failed, is a `200` whose answer says plainly that the question could not be
+expressed over these fields. They are different because the user's next move is different — one is
+"try again", the other is "ask me something else" — and collapsing them would turn "I have no field
+for shoe size" into a red error box. Each repair is a second billable request, which the cap is
+checked against separately (ADR-070); one is worth it, because "you used a field that does not
+exist, here is the list again" is the commonest failure and the one a model fixes reliably.
+
+### ADR-104 — A relation filter travels as a name, and the database decides which record
+
+**Context.** `organization` is a `relation` attribute and its wire value is a record id (ADR-032).
+The model cannot know an id, so on a strict reading "who works at Northstar Ventures" — the most
+obvious question anyone will type — is unanswerable.
+
+**Options.** (1) Refuse relation filters and document the gap. (2) Let the model emit a **name**,
+resolved to ids by a database read before the filter is built. (3) Put the record ids in the prompt.
+
+**Choice.** Option 2. `findRecordsByLabel` matches on `label_norm` with `mutuals_norm` on both sides,
+in SQL (ADR-019), batched one round trip per target object type.
+
+**Consequences.** This is §4.8's rule in one line of code: the model produced the string
+`"Northstar Ventures"`, and the database decided whether that is a record — or, when it is not, the
+filter is refused with a complaint the repair round-trip can act on. Option 3 is the one to avoid on
+principle: a prompt carrying record ids invites the model to select records, which is the exact
+authority §4.8 withholds from it, and it does not scale past a few dozen organizations anyway.
+
+**All** matching ids come back rather than the oldest one. Two records can share a name — that is
+what §6.9's merge exists for — and "everyone at Kiln Robotics" must not silently mean one of the two
+Kiln Robotics records. The same read is what makes an option **label** acceptable where a key was
+asked for: the model is shown `investor=Investor` and will sometimes write the half a person would,
+and one lookup is cheaper than a repair round-trip. An **archived** option key is still accepted,
+because a filter may legitimately name an option retired last month — exactly as a saved view
+holding one still renders — while the suggestion list offers only live options.
+
+### ADR-105 — The cost window is the profile's civil day, and the gate wraps an injected provider too
+
+**Context.** ADR-070 says the cap is checked immediately before every billable HTTP POST, against a
+process-local counter refreshed from an indexed query. It does not say what "daily" means, and it
+assumes the only provider is the built-in transport.
+
+**Options for the window.** (1) A UTC day. (2) A rolling 24 hours. (3) The profile's civil day.
+
+**Choice.** Option 3, with the boundary derived **in SQL** from an injected instant:
+`created_at >= date_trunc('day', $now at time zone $tz) at time zone $tz`.
+
+**Consequences.** Every other "today" in this product is the profile's (ADR-045), and a breaker that
+resets at 02:00 local time is a support question waiting to happen. Postgres carries the tz database,
+so this is the one implementation that gets a DST-shortened day right, and `now()` still never
+reaches the query. The refresh is every five seconds rather than every call: the counter is exact for
+this process because every response adds to it, and the query exists only to notice a second process
+— `apps/worker`, a CLI, a `pnpm llm:record` run. Five seconds bounds how far behind the breaker can
+be, for one indexed aggregate per five seconds of continuous traffic rather than one per request.
+
+**And the gate wraps an injected provider.** Only the transport can enforce "once per HTTP POST",
+because only it knows how many POSTs one call becomes. But a fixture provider that skipped the gate
+entirely would make the cap untestable at the route level, which is the level worth testing it at —
+so `LlmClient` passes the same closure down to the transport _or_ wraps an injected provider with it,
+never both. The 429 the route answers with is asserted against a real database.
+
+The queries live in `packages/db/src/repositories/llm.ts`, not in the LLM module. `llm_call` is an
+ordinary table and reading it is an ordinary read; ADR-071's rule exists to keep the client that
+_spends money_ out of business logic. Putting the two queries in a repository is what lets
+`GET /stats/llm` report yesterday's spend without being granted an exemption it does not need.
+
+### ADR-106 — OpenRouter lists no embedding models today; the embedding default moves to OpenAI direct
+
+**Context.** ADR-069 chose OpenRouter's `/api/v1/embeddings` on the strength of a live check in
+Stage 1: _"the endpoint exists; 37 embedding models are listed; native 1536 dimensions"_. §9 requires
+`embed()` to exist now; nothing in Phase 1 calls it.
+
+**The re-check, 2026-09-05.** `GET https://openrouter.ai/api/v1/models` returns **431 models and not
+one** with an embedding output modality. `?category=embedding` returns an empty list.
+`openai/text-embedding-3-small` is not in the catalogue at all.
+
+**Options.** (1) Keep the default and record that it is now unverified. (2) Default to the fallback
+ADR-069 itself named as provably config-only. (3) Delete `embed()` until Stage 8.
+
+**Choice.** Option 2. `LLM_EMBEDDING_BASE_URL` defaults to `https://api.openai.com/v1` — same wire
+format, native 1536 dimensions, matching `search_document.embedding vector(1536)` — with its own
+optional `LLM_EMBEDDING_API_KEY`.
+
+**Consequences.** Nothing breaks, because nothing calls it: Phase 1 ships the typed `embed()` and one
+fixture test, and Stage 8 gets the dimension probe, the never-mix-models guard and the fallback
+ladder alongside the first vector. Option 3 was rejected because §9 asks for the port to exist, and
+a port deleted is an extension point that has to be re-argued. What this ADR really records is the
+method: ADR-069's claim was true when written and is false now, and the only reason anyone knows is
+that it was re-run instead of quoted. The claim about `dimensions` on
+`google/gemini-embedding-2` was already marked UNVERIFIED and stays that way.
+
+### ADR-107 — The `ask` e2e fakes the provider one HTTP hop out, rather than replaying
+
+**Context.** ADR-068 built `LLM_MODE=replay` for exactly this: fixtures on disk, no socket, no money.
+ADR-072 lists "replay-mode e2e" among the four test layers.
+
+**The problem, found by trying it.** The replay key is ADR-068's five parts, one of which is the hash
+of the **task input** — and the ask prompt's input contains **today's date**, because ADR-034 injects
+it and §6.1's answer needs it for "in the last 30 days". A committed fixture therefore replays only
+on the day it was recorded and fails loudly every day after: the mechanism working exactly as
+designed, and a test that cannot be kept green.
+
+**Options.** (1) Special-case `today` out of the input hash. (2) Pin the built API's clock in e2e.
+(3) Point `LLM_BASE_URL` at a stub HTTP server in the Playwright `webServer` list.
+
+**Choice.** Option 3. `e2e/support/model-stub.mjs`, an OpenAI-compatible `/chat/completions` that
+answers from a small table keyed on the question, on port 3202 for the same reason the app runs on
+3200/3201.
+
+**Consequences.** This tests _more_ than replay would, not less: everything below the socket is the
+real thing — the transport, the retry policy, `usage.cost`, the strict `response_format`, the Zod
+re-validation, `buildFilterSet`, the query compiler, the trace row. Only the model's judgement is
+faked, and the model's judgement is the one thing an end-to-end test could never assert anyway.
+Option 1 would have made the key incoherent in the same way the "sha256 of the rendered messages"
+`prompt_hash` was (ADR-068). Option 2 means a production-affecting clock seam for the benefit of a
+test. Replay stays what it is for: a developer re-running one recorded exchange on demand, with
+`pnpm llm:record` writing the fixture and `readFixture` unit-tested.
+
+### ADR-108 — What building it settled, and the four bugs that were silent
+
+**Two decisions that only appeared once the code existed.**
+
+**`routes/stage-six.ts` is three files.** ADR-071's rule names the routes allowed to import the LLM
+module **by exact path**, and one file holding `ask`, `search` and `quickCapture` makes that grant
+all-or-nothing — `search` is a trigram query over `search_document` and has no business being able
+to reach a model. `ask.ts`, `search.ts` and `quick-capture.ts` are three grants, two of which are
+currently for routes that still answer 501. A probe confirms the rule fires in both directions: a
+route importing `../llm/client.ts` and a `packages/db` file importing it both fail lint.
+
+**`getLlmStats` is a new operation** and is registered rather than planned. ADR-070 asks for
+`GET /api/v1/stats/llm`; ADR-031's list did not name it, so it is added the way ADR-098's ninth
+import operation was — written down, not smuggled in. `PLANNED_OPERATIONS` now holds exactly one
+name, `generateContactSummary`, for §6.5's on-demand summary in the second half.
+
+**Migration 0006's comment on `prompt_hash` was wrong and is corrected in place.** It said "sha256 of
+the rendered messages"; ADR-068 corrected that to the prompt _template_ hash, constant per version,
+and the comment had never caught up. A per-input hash there would vary per call, subsume
+`input_hash`, and make the five-part replay key incoherent — every row its own key, nothing ever
+replaying. The SQL is unchanged and Kysely's ledger tracks migrations by name, so an applied database
+is unaffected; an integration test now asserts the two hashes behave the way the comment claims.
+
+**Four bugs, found by running the thing. Three were silent.**
+
+- **The relation config is `targetObjectType`, not `target_object_type`.** Migration 0002 stores the
+  snake_case form and `repositories/attributes.ts` normalises it on the way out, so reading the
+  stored spelling in `apps/api` returns `null` for **every** relation field — the model would never
+  be told what a name could name, and every relation filter would fail to resolve with no error
+  anywhere. Caught by a unit test written against the core-side shape.
+- **The e2e stub matched the timezone, not the question.** Keyed on `/berlin/i` over the whole user
+  message, it answered a question about German organizations to _"what is the weather like?"_,
+  because the prompt's first line is `Today is 2026-09-05 in Europe/Berlin`. A wrong answer, not an
+  error. It now reads only what follows `Question:`.
+- **`mutuals_norm` does not collapse an internal run of spaces.** It is `lower(unaccent(btrim(…)))`
+  and nothing else (ADR-019), so `Northstar   Ventures` does not match `Northstar Ventures`. Asserted
+  in both directions now, because "normalised" invites the assumption that it does.
+- **`tags` offers `contains_any_of`, not `has_any_of`.** A test asserting a refusal passed for the
+  wrong reason — the operator was rejected before the empty value list could be. The code was right;
+  the test was checking something else and saying it was checking this.
+
+**One assumption that held.** ADR-072 named undici's `MockAgent` as the same-day fallback if msw's
+fetch interception misbehaved under Node 24. It does not: seventeen contract tests over the real
+transport pass, including the total-deadline assertion that counts requests.

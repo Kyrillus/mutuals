@@ -12,6 +12,10 @@ verifyDepsBeforeRun: install
 # pnpm 11 takes a map here; onlyBuiltDependencies and friends were removed in v11.
 allowBuilds:
   esbuild: true
+  # msw's postinstall copies a service worker into a public/ directory for browser mode.
+  # ADR-072 uses `msw/node` only -- the transport is tested in Node, never in a page -- so the
+  # script has nothing to do here.
+  msw: false
 
 minimumReleaseAgeExclude:
   - '@rolldown/binding-android-arm64@1.2.7'

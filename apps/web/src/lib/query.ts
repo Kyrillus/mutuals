@@ -42,6 +42,8 @@ export const queryClient = new QueryClient({
  */
 export const qk = {
   stats: () => ['stats'] as const,
+  /** §4.8's availability and ADR-070's spend. Refetched after every question. */
+  llmStats: () => ['stats', 'llm'] as const,
   profile: () => ['profile'] as const,
   attributeDefinitions: (objectType: string) => ['attribute-definitions', objectType] as const,
   /** Every list page for one object type, whatever the filter. */

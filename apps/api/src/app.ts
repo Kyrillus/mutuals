@@ -26,6 +26,7 @@ import type { AppContext } from './context.ts'
 import { PROBLEM_CONTENT_TYPE, asApiError, toProblem } from './errors.ts'
 import { registerOpenApiSchemas } from './http/registry.ts'
 import { DOCS_PREFIX, registerAuth } from './plugins/auth.ts'
+import { askRoutes } from './routes/ask.ts'
 import { attributeDefinitionRoutes } from './routes/attribute-definitions.ts'
 import { contactRoutes } from './routes/contacts.ts'
 import { followUpRoutes } from './routes/follow-ups.ts'
@@ -33,9 +34,10 @@ import { importBatchRoutes } from './routes/import-batches.ts'
 import { mergeRoutes } from './routes/merge.ts'
 import { interactionRoutes } from './routes/interactions.ts'
 import { organizationRoutes } from './routes/organizations.ts'
+import { quickCaptureRoutes } from './routes/quick-capture.ts'
 import { recordRoutes } from './routes/records.ts'
+import { searchRoutes } from './routes/search.ts'
 import { settingsRoutes } from './routes/settings.ts'
-import { stageSixRoutes } from './routes/stage-six.ts'
 import { viewRoutes } from './routes/views.ts'
 
 export const API_PREFIX = '/api/v1'
@@ -180,7 +182,9 @@ export async function buildApp(ctx: AppContext, options: BuildOptions = {}): Pro
       await instance.register(attributeDefinitionRoutes, { ctx })
       await instance.register(settingsRoutes, { ctx })
       await instance.register(viewRoutes, { ctx })
-      await instance.register(stageSixRoutes, { ctx })
+      await instance.register(askRoutes, { ctx })
+      await instance.register(searchRoutes, { ctx })
+      await instance.register(quickCaptureRoutes, { ctx })
     },
     { prefix: API_PREFIX },
   )

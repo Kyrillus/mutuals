@@ -1,0 +1,111 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ask.filter > matches its golden JSON schema 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "declineReason": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "filters": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string",
+          },
+          "from": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "n": {
+            "type": [
+              "number",
+              "null",
+            ],
+          },
+          "op": {
+            "type": "string",
+          },
+          "preset": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "to": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "value": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+        },
+        "required": [
+          "field",
+          "op",
+          "value",
+          "values",
+          "from",
+          "to",
+          "preset",
+          "n",
+          "unit",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
+    "objectType": {
+      "enum": [
+        "contact",
+        "organization",
+      ],
+      "type": "string",
+    },
+    "subject": {
+      "type": "string",
+    },
+    "understood": {
+      "type": "boolean",
+    },
+  },
+  "required": [
+    "understood",
+    "objectType",
+    "filters",
+    "subject",
+    "declineReason",
+  ],
+  "type": "object",
+}
+`;

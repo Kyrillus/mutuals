@@ -1,0 +1,77 @@
+{
+  "prompts": [
+    {
+      "id": "ask.filter",
+      "version": 1,
+      "taskKind": "question",
+      "promptHash": "e3eb8f9491271c0d1125b2b86b23c5784b163b5ae4dc0f4b44b11790f11fe8ef",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "understood": {
+            "type": "boolean"
+          },
+          "objectType": {
+            "type": "string",
+            "enum": ["contact", "organization"]
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "op": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": ["string", "null"]
+                },
+                "values": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "from": {
+                  "type": ["string", "null"]
+                },
+                "to": {
+                  "type": ["string", "null"]
+                },
+                "preset": {
+                  "type": ["string", "null"]
+                },
+                "n": {
+                  "type": ["number", "null"]
+                },
+                "unit": {
+                  "type": ["string", "null"]
+                }
+              },
+              "required": ["field", "op", "value", "values", "from", "to", "preset", "n", "unit"],
+              "additionalProperties": false
+            }
+          },
+          "subject": {
+            "type": "string"
+          },
+          "declineReason": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["understood", "objectType", "filters", "subject", "declineReason"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

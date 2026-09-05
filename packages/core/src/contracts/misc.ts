@@ -70,21 +70,41 @@ export const SearchResponseSchema = z.object({
   ),
 })
 
+/** The two object types a question can be about. Interactions are reached *through* a contact. */
+export const AskObjectTypeSchema = z.enum(['contact', 'organization'])
+
 export const AskRequestSchema = z.object({
   question: z.string().min(1).max(2000),
-  objectType: z.enum(['contact', 'organization']).optional(),
+  /** Pins the table. Left out, the model chooses, and `objectType` in the answer says which. */
+  objectType: AskObjectTypeSchema.optional(),
 })
 
 /**
  * §4.8: the answer always ships the filter it ran, so the user can trust it or correct it. That is
  * why `filter` is the ordinary filter model and not a private shape — "how I searched" is a link
  * into the same table the user could have built by hand.
+ *
+ * Three fields beyond the original Stage-1 sketch, each because the sketch could not be rendered
+ * without it (ADR-102). `objectType` says which table the filter belongs to — a bare `[{field:
+ * 'city', …}]` is not enough to build the link that opens it. `total` is the real count, because
+ * `matches` is capped at {@link ASK_MATCH_LIMIT} and "5 of 340" reads very differently from "5".
+ * And `filter` is **nullable**: an empty array is a filter that matches everyone, so a question
+ * that could not be turned into one has to be a different value rather than the same one.
  */
 export const AskResponseSchema = z.object({
   answer: z.string(),
-  filter: filterSetSchema,
+  objectType: AskObjectTypeSchema,
+  /** `null` when nothing ran — the question did not become a filter, and the answer says why. */
+  filter: filterSetSchema.nullable(),
   matches: z.array(RecordRefSchema),
+  total: z.int(),
 })
+
+export type AskRequest = z.output<typeof AskRequestSchema>
+export type AskResponse = z.output<typeof AskResponseSchema>
+
+/** How many chips one answer carries. The count in `total` is exact regardless. */
+export const ASK_MATCH_LIMIT = 25
 
 export const QuickCaptureRequestSchema = z.object({
   text: z.string().min(1).max(10_000),
@@ -105,3 +125,42 @@ export const QuickCaptureResponseSchema = z.object({
   interaction: z.unknown().nullable(),
   followUp: z.unknown().nullable(),
 })
+
+// -- What the LLM layer costs (ADR-070) ----------------------------------------------------------
+
+/**
+ * `GET /stats/llm`: spend per day, per task and per prompt version.
+ *
+ * It exists because "a bug that loops spends someone's real money" is the reason the cap exists at
+ * all, and a cap with no way to see what it is counting is a number nobody can trust. `limitUsd` and
+ * `spentTodayUsd` are the two the dashboard needs; `rows` is the breakdown.
+ */
+export const LlmSpendRowSchema = z.object({
+  day: CivilDateSchema,
+  taskKind: z.enum(['extraction', 'question', 'summary', 'embedding']),
+  promptId: z.string(),
+  promptVersion: z.int(),
+  calls: z.int(),
+  costUsd: z.number(),
+  promptTokens: z.int(),
+  completionTokens: z.int(),
+  /** Calls whose provider reported nothing, so a $0.00 total can be read correctly. */
+  unreportedCalls: z.int(),
+})
+
+export const LlmStatsSchema = z.object({
+  /** `0` means the circuit breaker is switched off. */
+  limitUsd: z.number(),
+  spentTodayUsd: z.number(),
+  /** `live`, `replay` or `off`, plus the sentence to show when the feature cannot run. */
+  mode: z.enum(['live', 'replay', 'off']),
+  enabled: z.boolean(),
+  disabledReason: z.string().nullable(),
+  today: CivilDateSchema,
+  rows: z.array(LlmSpendRowSchema),
+})
+
+export type LlmStats = z.output<typeof LlmStatsSchema>
+
+/** How far back `GET /stats/llm` looks. Long enough to see a month's shape, short enough to stay one screen. */
+export const LLM_STATS_DAYS = 30

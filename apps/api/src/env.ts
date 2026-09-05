@@ -78,12 +78,55 @@ export const EnvSchema = z.object({
     .refine(isTimeZone, { error: 'Not an IANA timezone name, for example Europe/Berlin.' })
     .default('Europe/Berlin'),
 
-  // -- LLM (Stage 6; the app runs fine with all of these unset) --------------------------------
+  // -- LLM (Stage 6) ---------------------------------------------------------------------------
+  /**
+   * `live` calls the provider. `replay` reads recorded fixtures and never opens a socket, which is
+   * what the e2e suite runs under. `off` makes every task answer 503 `llm_disabled`.
+   *
+   * The default is `live`, but a live call still needs a key: with no `OPENROUTER_API_KEY` the
+   * client reports itself disabled, so a fresh checkout with an empty `.env` runs the whole app
+   * and only the three agent routes say so.
+   */
+  LLM_MODE: z.enum(['live', 'replay', 'off']).default('live'),
   OPENROUTER_API_KEY: optionalText,
   LLM_BASE_URL: z.url().default('https://openrouter.ai/api/v1'),
-  LLM_MODEL_EXTRACTION: optionalText,
-  LLM_MODEL_ANSWER: optionalText,
-  LLM_MODEL_SUMMARY: optionalText,
+  /**
+   * One model per task (§3.1). These are *fallbacks*: `modelFor()` reads the `llm_setting` row
+   * first, so a model can be swapped without a deploy (ADR-064).
+   *
+   * The default is the same id three times on purpose — one model that is verified to exist and to
+   * support structured outputs is a better starting point than three guesses, and the whole point
+   * of the per-task split is that Simon can move one of them without touching the others.
+   */
+  LLM_MODEL_EXTRACTION: z.string().trim().min(1).default('openai/gpt-4.1-mini'),
+  LLM_MODEL_ANSWER: z.string().trim().min(1).default('openai/gpt-4.1-mini'),
+  LLM_MODEL_SUMMARY: z.string().trim().min(1).default('openai/gpt-4.1-mini'),
+  /**
+   * Embeddings live behind their own port and their own base URL (ADR-069). Nothing in Phase 1
+   * calls this: `embed()` exists, is typed and has one fixture test, and the first vector is
+   * written in Stage 8.
+   */
+  LLM_MODEL_EMBEDDING: z.string().trim().min(1).default('openai/text-embedding-3-small'),
+  LLM_EMBEDDING_BASE_URL: z.url().default('https://api.openai.com/v1'),
+  LLM_EMBEDDING_API_KEY: optionalText,
+  /**
+   * ADR-065's two timeouts, and they are two on purpose.
+   *
+   * `LLM_TOTAL_TIMEOUT_MS` is created once *before* the retry loop, so a hung provider cannot be
+   * retried three times into a three-minute request. `LLM_ATTEMPT_TIMEOUT_MS` bounds one attempt so
+   * a stalled socket is retried rather than eating the whole deadline. The total default stays
+   * under any reasonable proxy timeout.
+   */
+  LLM_TOTAL_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(45_000),
+  LLM_ATTEMPT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(20_000),
+  /**
+   * Whether the request and response bodies are written into `llm_call` (ADR-068).
+   *
+   * A privacy switch, not a housekeeping one: the bodies contain the user's own notes and contact
+   * data. On by default because the trace is the reason the table exists, and this is one person's
+   * database on their own laptop.
+   */
+  LLM_TRACE_BODIES: z.enum(['on', 'off']).default('on'),
   /**
    * A circuit breaker, not a budget (ADR-070, and Q7 answered 2026-09-05).
    *

@@ -450,3 +450,43 @@ export async function countRecords(exec: Executor, objectType: ObjectType): Prom
   `.execute(exec)
   return Number(row.rows[0]?.total ?? 0)
 }
+
+/**
+ * Records of one type whose label matches any of these names, keyed by the normalised name.
+ *
+ * A pure read, and it exists because §4.8's "ask the network" has to turn *"who works at Northstar
+ * Ventures"* into a filter over a `relation` attribute, whose wire value is a record id (ADR-032).
+ * The LLM emits the name the user typed; this turns the name into ids. That split is §4.8's rule
+ * made literal — the model extracts a string, and code decides which record it means, or that it
+ * means none.
+ *
+ * Normalisation is `mutuals_norm()` on both sides, in SQL, so TypeScript never produces a value
+ * compared against `label_norm` (ADR-019). All matching ids come back rather than the oldest one:
+ * two records can share a name — that is what §6.9's merge is for — and "everyone at Kiln Robotics"
+ * should not silently mean one of the two Kiln Robotics records.
+ */
+export async function findRecordsByLabel(
+  exec: Executor,
+  objectType: ObjectType,
+  names: readonly string[],
+): Promise<ReadonlyMap<string, readonly Uuid[]>> {
+  const trimmed = names.map((name) => name.trim()).filter((name) => name !== '')
+  if (trimmed.length === 0) return new Map()
+
+  const rows = await sql<{ input: string; id: Uuid }>`
+    select q.name as input, r.id as id
+      from unnest(${sql.val([...new Set(trimmed)])}::text[]) as q(name)
+      join record r
+        on r.object_type = ${objectType}
+       and r.label_norm = mutuals_norm(q.name)
+     order by q.name, r.created_at, r.id
+  `.execute(exec)
+
+  const byName = new Map<string, Uuid[]>()
+  for (const row of rows.rows) {
+    const list = byName.get(row.input)
+    if (list === undefined) byName.set(row.input, [row.id])
+    else list.push(row.id)
+  }
+  return byName
+}

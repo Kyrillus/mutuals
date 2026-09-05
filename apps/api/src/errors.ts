@@ -103,6 +103,22 @@ export function payloadTooLarge(detail: string): ApiError {
   })
 }
 
+/**
+ * The four LLM failures, each with the status a client can act on (ADR-065, ADR-070).
+ *
+ * They are separate functions rather than one `llmError(kind)` because the *detail* is the whole
+ * value here: "the day's $5.00 is spent" and "there is no API key" are the same class of event to a
+ * machine and completely different sentences to a person.
+ */
+export function llmUnavailable(detail: string): ApiError {
+  return new ApiError({
+    status: 503,
+    code: 'llm_disabled',
+    title: 'AI features are off',
+    detail,
+  })
+}
+
 /** §7's Stage-6 surface: documented, reachable, and honest about not being built yet. */
 export function notImplemented(operation: string, stage: string): ApiError {
   return new ApiError({
@@ -110,6 +126,37 @@ export function notImplemented(operation: string, stage: string): ApiError {
     code: 'not_implemented',
     title: 'Not implemented yet',
     detail: `"${operation}" arrives in ${stage}. Its request and response shapes are already in the OpenAPI document so a client can be written against them.`,
+  })
+}
+
+/**
+ * `LlmError` → the problem envelope.
+ *
+ * Structural rather than `instanceof`, deliberately. `apps/api/src/llm/` is a directory this file
+ * must not import — ADR-071's rule runs both ways, and an error handler that pulls in the model
+ * client to name a class is exactly the coupling the rule exists to prevent. The four fields it
+ * reads are the `LlmError` contract, and `errors.test.ts` asserts the mapping against the real
+ * classes so the duck-typing cannot drift from them.
+ */
+const LLM_TITLES: Readonly<Record<string, string>> = {
+  llm_disabled: 'AI features are off',
+  llm_budget_exceeded: "Today's AI budget is spent",
+  llm_unavailable: 'The AI service did not answer',
+  llm_invalid_response: 'The AI service answered incorrectly',
+}
+
+function fromLlmError(error: unknown): ApiError | null {
+  if (typeof error !== 'object' || error === null) return null
+  const candidate = error as { code?: unknown; status?: unknown; message?: unknown }
+  if (typeof candidate.code !== 'string' || typeof candidate.status !== 'number') return null
+  const title = LLM_TITLES[candidate.code]
+  if (title === undefined) return null
+  return new ApiError({
+    status: candidate.status,
+    code: candidate.code,
+    title,
+    // Safe to show: every one of these messages is written for the person who typed the question.
+    detail: typeof candidate.message === 'string' ? candidate.message : title,
   })
 }
 
@@ -192,6 +239,9 @@ function fromPostgres(error: unknown): ApiError | null {
 
 export function asApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error
+
+  const llm = fromLlmError(error)
+  if (llm !== null) return llm
 
   const fastify = error as FastifyError
   const validation = fromFastifyValidation(fastify)

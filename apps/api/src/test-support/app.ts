@@ -15,6 +15,8 @@ import type { JobHandler, JobQueue, JobQueueName } from '@mutuals/db'
 import { buildApp, type App } from '../app.ts'
 import type { AppContext } from '../context.ts'
 import { parseEnv, type Env } from '../env.ts'
+import { LlmClient } from '../llm/client.ts'
+import { ScriptedProvider } from '../llm/test-support.ts'
 
 /** Pinned so "due this week", "overdue" and "added in the last 30 days" mean one thing. */
 export const TEST_NOW = new Date('2026-06-15T09:00:00.000Z')
@@ -107,8 +109,47 @@ export function testJobs(): InlineJobQueue {
   return cache[QUEUE_KEY]
 }
 
+const LLM_KEY = Symbol.for('mutuals.test.api.llm')
+
+interface LlmCache {
+  [LLM_KEY]?: { readonly provider: ScriptedProvider; readonly client: LlmClient }
+}
+
+/**
+ * ADR-072's layer 2, wired into the integration app: one scripted provider per process, which a
+ * test loads with the answers it wants and then asserts what was asked.
+ *
+ * A singleton because `getTestApp()` is one: the context is built once, so a per-test client would
+ * never be the one the route holds. `resetLlm()` in the suite's `beforeEach` is what keeps tests
+ * independent — including the cost counter, which lives on the client and would otherwise carry a
+ * previous test's spending into the next one's budget assertion.
+ */
+export function testLlm(): { provider: ScriptedProvider; client: LlmClient } {
+  const cache = globalThis as LlmCache
+  if (cache[LLM_KEY] === undefined) {
+    const provider = new ScriptedProvider()
+    cache[LLM_KEY] = {
+      provider,
+      client: new LlmClient({ env: testEnv(), now: () => TEST_NOW, provider }),
+    }
+  }
+  return cache[LLM_KEY]
+}
+
+export function resetLlm(): void {
+  const { provider, client } = testLlm()
+  provider.reset()
+  client.budget.reset()
+}
+
 export function testContext(): AppContext {
-  return { db: testDb(), env: testEnv(), now: () => TEST_NOW, jobs: testJobs() }
+  return {
+    db: testDb(),
+    env: testEnv(),
+    now: () => TEST_NOW,
+    jobs: testJobs(),
+    llm: testLlm().client,
+  }
 }
 
 export function getTestApp(): Promise<App> {

@@ -24,6 +24,7 @@ import {
 } from '@mutuals/db'
 
 import type { Env } from './env.ts'
+import type { LlmClient } from './llm/client.ts'
 
 export interface AppContext {
   readonly db: Executor
@@ -39,6 +40,15 @@ export interface AppContext {
    * connecting to Postgres to check a list of route names.
    */
   readonly jobs?: JobQueue
+  /**
+   * ADR-064's task client, or `undefined` where nothing can call it — `emit-openapi.ts` builds the
+   * app with no database at all, and giving it a model client to satisfy a type would mean
+   * constructing one to write a JSON file.
+   *
+   * One per process, because the cost cap's counter lives on it: two concurrent requests each
+   * building their own client would each believe the whole day's budget was theirs (ADR-070).
+   */
+  readonly llm?: LlmClient
 }
 
 /**

@@ -31,7 +31,7 @@ twice, asks before importing any of them, and imports the same file again withou
   plan. The source of truth for product decisions. Reference screenshots in [`docs/refs/`](./docs/refs).
 - [`docs/PLAN.md`](./docs/PLAN.md) — the implementation plan, in two layers: a plain summary and the
   technical detail.
-- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 100 records.
+- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 108 records.
   `docs/adr-archive/` keeps the reasoning trail, including the designs that were rejected.
 
 ### Running it

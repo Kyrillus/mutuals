@@ -12,6 +12,7 @@ import { assertSchemaCurrent, makeDb, sweepIfStale, type Executor } from '@mutua
 import { buildApp } from './app.ts'
 import { loadEnv, type Env } from './env.ts'
 import { startWorker } from './jobs/register.ts'
+import { LlmClient } from './llm/client.ts'
 
 async function main(): Promise<void> {
   const env = loadEnv()
@@ -41,7 +42,22 @@ async function main(): Promise<void> {
     context: { db, env, now },
   })
 
-  const app = await buildApp({ db, env, now, ...(jobs === undefined ? {} : { jobs }) })
+  /**
+   * One client for the process (ADR-070). The cost cap's counter lives on it, so a per-request
+   * client would give every concurrent request its own view of the day's spend and the breaker
+   * would trip at N times the limit under N-way concurrency.
+   */
+  const llm = new LlmClient({ env, now })
+
+  const app = await buildApp({ db, env, now, llm, ...(jobs === undefined ? {} : { jobs }) })
+
+  const availability = llm.availability()
+  app.log.info(
+    { mode: availability.mode, enabled: availability.enabled },
+    availability.enabled
+      ? `AI features are on (${availability.mode}); daily cap $${env.LLM_DAILY_COST_LIMIT_USD.toFixed(2)}`
+      : (availability.reason ?? 'AI features are off'),
+  )
 
   const shutdown = (signal: string): void => {
     app.log.info({ signal }, 'shutting down')

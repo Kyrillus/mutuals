@@ -41,10 +41,31 @@ describe('parseEnv', () => {
     expect(env.LLM_DAILY_COST_LIMIT_USD).toBe(5)
   })
 
-  it('reads an empty value as unset, so `LLM_MODEL_ANSWER=` is not a model called ""', () => {
-    const env = parseEnv({ ...MINIMAL, LLM_MODEL_ANSWER: '', OPENROUTER_API_KEY: '   ' })
-    expect(env.LLM_MODEL_ANSWER).toBeUndefined()
+  it('reads an empty value as unset, so `OPENROUTER_API_KEY=` is not a key called ""', () => {
+    const env = parseEnv({ ...MINIMAL, OPENROUTER_API_KEY: '   ' })
     expect(env.OPENROUTER_API_KEY).toBeUndefined()
+  })
+
+  // The same dropping rule, one step further along: a key with a default is not merely "unset",
+  // it falls back. `LLM_MODEL_ANSWER=` in a .env file has to mean the documented model rather
+  // than a model called "", which the schema's `.min(1)` would otherwise reject outright.
+  it('lets an emptied key with a default fall back to it', () => {
+    expect(parseEnv({ ...MINIMAL, LLM_MODEL_ANSWER: '' }).LLM_MODEL_ANSWER).toBe(
+      'openai/gpt-4.1-mini',
+    )
+  })
+
+  it('defaults to live mode, which still needs a key before anything is billable', () => {
+    const env = parseEnv(MINIMAL)
+    expect(env.LLM_MODE).toBe('live')
+    expect(env.OPENROUTER_API_KEY).toBeUndefined()
+  })
+
+  // ADR-065: the deadline that bounds the whole request, and the one that bounds one attempt.
+  it('bounds the whole request under any reasonable proxy timeout', () => {
+    const env = parseEnv(MINIMAL)
+    expect(env.LLM_TOTAL_TIMEOUT_MS).toBe(45_000)
+    expect(env.LLM_ATTEMPT_TIMEOUT_MS).toBeLessThan(env.LLM_TOTAL_TIMEOUT_MS)
   })
 
   it('fails fast, naming every key at once', () => {

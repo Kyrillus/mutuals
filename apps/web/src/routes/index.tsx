@@ -1,10 +1,11 @@
 import { addDays, civilIn } from '@mutuals/core'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Building2, CalendarClock, ChevronRight, Sparkles, Users } from 'lucide-react'
+import { Building2, CalendarClock, ChevronRight, Users } from 'lucide-react'
 
 import { useDisplay } from '@/attributes/display-context.tsx'
 import { formatRelativeDay } from '@/attributes/format.ts'
 import { PageHeader, Section } from '@/components/app-shell/page.tsx'
+import { AskPanel } from '@/features/ask/ask-panel.tsx'
 import { FollowUpList } from '@/features/follow-ups/follow-up-list.tsx'
 import { useFollowUps } from '@/features/follow-ups/use-follow-ups.ts'
 import { useRecordList } from '@/features/records/use-record-list.ts'
@@ -40,6 +41,14 @@ function DashboardPage() {
         title={`${timeOfDayGreeting()}${profile.data ? `, ${profile.data.firstName}` : ''}`}
         description={stats.data ? formatToday(stats.data.today) : undefined}
       />
+
+      {/*
+        §6.1 puts this directly under the greeting and above the numbers: it is the most prominent
+        thing on the page, which is what "a prominent single input" asks for.
+      */}
+      <Section title="Ask the network">
+        <AskPanel />
+      </Section>
 
       <Section title="Key numbers">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -104,20 +113,6 @@ function DashboardPage() {
 
       <Section title="Recently interacted">
         <RecentlyInteracted />
-      </Section>
-
-      <Section title="Still to come">
-        <div className="border-border text-muted-foreground rounded-lg border border-dashed p-5 text-sm">
-          <p className="text-foreground mb-2 flex items-center gap-2 font-medium">
-            <Sparkles className="size-4" />
-            Ask the network
-          </p>
-          <p>
-            §6.1&rsquo;s prominent &ldquo;Ask anything about your network…&rdquo; input, with the
-            filter it ran shown under &ldquo;How I searched&rdquo;, arrives with the LLM layer in
-            Stage 6 (§4.8).
-          </p>
-        </div>
       </Section>
     </>
   )

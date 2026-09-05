@@ -413,29 +413,42 @@ email is. The current behaviour is asserted by a test and named in a comment in
 
 ---
 
-## 6. The LLM layer, and where it plugs in
+## 6. The LLM layer
 
-Nothing of it ships in Stage 1 except the two tables it will read and write. It is described here
-because §12 of the brief asks that the co-founder be able to read this document and know exactly
-where to add it.
+Built in Stage 6's first half: the module, the cost cap, the trace, and §4.8's "ask the network".
+Quick capture (§4.8), the on-demand summary (§6.5) and the ⌘K palette (§6.10) are the second half;
+`search` and `quickCapture` still answer a documented `501` with their real schemas in
+`docs/openapi.json`, so a client or an MCP adapter can be written against the final shape today.
 
-**It will be one module, `apps/api/src/llm/`, and nothing else may import it.** ESLint enforces that
-from the moment the directory exists (ADR-071), so "no LLM calls scattered through business logic"
-becomes a build failure rather than a review note.
-
-Two of its three consumers are already on the wire. `search`, `ask` and `quickCapture` are
-registered routes today with their real request and response schemas in `docs/openapi.json`; they
-answer a documented `501` problem+json rather than an empty list, so a client, a fixture or an MCP
-adapter can be written against the final shape before the engine is fitted
-(`apps/api/src/routes/stage-six.ts`).
+**It is one module, `apps/api/src/llm/`, and almost nothing may import it.** ESLint enforces it
+(ADR-071): `packages/core` and `packages/db` never, and among the routes only the ones listed by
+exact path — `ask.ts` today, `quick-capture.ts` and `summary.ts` in the second half. So duplicate
+matching, filter compilation and warmth **cannot** reach a model, and their decisions are
+unit-testable with no network and no fixtures. A probe confirms the rule fires in both directions.
 
 ```
-      route ──▶ llm/tasks.ts ──▶ llm/provider.ts (port) ──▶ llm/transport.ts ──▶ OpenRouter
-                    │                    ▲                          │
-                    │                    └── EmbeddingProvider ──────┘
-                    ├──▶ llm/prompts/*.ts   versioned modules, locked by hash
-                    └──▶ llm_call           one row per call: the replayable trace
+   routes/ask.ts ──▶ llm/tasks/ask.ts ──▶ llm/client.ts ──▶ ChatProvider (port) ──▶ transport ──▶ OpenRouter
+        │                   │                   │                   ▲                    │
+        │                   │                   │                   └─ EmbeddingProvider ┘
+        │                   │                   ├──▶ llm/prompts/*.ts   versioned, locked by hash
+        │                   │                   ├──▶ llm/budget.ts      checked before every POST
+        │                   │                   └──▶ llm_call           one row per exchange
+        │                   ▼
+        │            packages/core      parseFilterSet · the resolver · the operator table
+        ▼
+   http/list.ts ──▶ the same compiled query the contacts table runs
 ```
+
+**One question, end to end.** The route loads the attribute definitions for contact _and_
+organization and hands the resolver's field list to the prompt — slugs, labels, types, operators and
+option keys, read from data, so a field created five minutes ago is in the prompt and a deleted one
+is not. The model returns a flat proposal; `tasks/ask.ts` checks every slug, every operator and every
+value against the resolver, turns a relation **name** into record ids with one database read
+(ADR-104), and hands the result to `parseFilterSet`. What survives is an ordinary `FilterSet`, run
+through the ordinary `listRecords` — so the answer can show the filter it ran because that filter is
+the one the user could have built by hand, and "Open as a table" lands on a page producing exactly
+the same rows. A model failure is a sentence, not a 500: a slug that does not exist earns one repair
+round-trip and then a plain-English answer (ADR-103).
 
 - **The port.** `ChatProvider` and a separate `EmbeddingProvider`, both OpenAI-compatible. Swapping
   OpenRouter for a direct Anthropic/OpenAI/Ollama endpoint is a base URL. Embeddings are a separate
@@ -449,10 +462,30 @@ adapter can be written against the final shape before the engine is fitted
   plus OpenRouter's `provider.require_parameters`, and then the response is validated again with the
   same Zod schema. One repair round-trip on a schema failure, carrying the validation errors; a
   second failure raises `LlmSchemaError` and the route returns 502.
-- **The trace.** Every call writes an `llm_call` row: prompt id and version, prompt hash, model
-  requested and model served, input hash, token usage, `usage.cost` as reported, latency, status,
-  and `repair_of_id` linking a repair to its original. That is what makes a bad answer replayable
-  and what makes a cost budget per HTTP request possible.
+- **The trace.** Every exchange writes an `llm_call` row — including the failures: prompt id and
+  version, the prompt _template_ hash, model requested and model served, input hash, token usage,
+  `usage.cost` as reported, latency, status, and `repair_of_id` linking a repair to its original.
+  A 429 that was never recorded is a cost cap nobody can explain afterwards. `LLM_TRACE_BODIES=off`
+  keeps everything but the request and response bodies, which is a privacy switch and not a
+  housekeeping one. **There is no retention job**: a single-user CRM making a few hundred calls a
+  month will not approach a size problem for years, and the whole mechanism is one statement —
+  `DELETE FROM llm_call WHERE created_at < now() - interval '1 year';`
+- **The cost cap.** `LLM_DAILY_COST_LIMIT_USD` (Q7: $5.00) is a circuit breaker, checked immediately
+  before **every** billable POST rather than once per task — the naive placement let one user action
+  bill up to six generations through retries and repair. The window is the profile's civil day,
+  derived in SQL (ADR-105). `GET /api/v1/stats/llm` shows the cap, today's spend and the breakdown
+  per day, task and prompt version; `unreportedCalls` is there so a total of $0.00 can be read
+  correctly, because ADR-070 records `NULL, 'unreported'` rather than estimating from a price table.
+- **Three modes.** `LLM_MODE=live` calls the provider; `replay` reads `fixtures/llm/` and fails
+  loudly with the `pnpm llm:record` command when a fixture is missing; `off` answers 503. A missing
+  API key is also 503, reported _before_ the user types rather than after they ask — `pnpm dev` on a
+  fresh checkout has no key and the whole rest of the app works.
+- **Four test layers, none of which spends money** (ADR-072). L1 golden `z.toJSONSchema` snapshots
+  per prompt. L2 a `ScriptedProvider` implementing the port, which is what the integration suite
+  drives. L3 msw contract tests over the real transport — asserting, among other things, that
+  `usage: {include:true}` is _not_ sent and that the total deadline terminates rather than retrying.
+  L4 one live smoke test behind `MUTUALS_LLM_LIVE=1`. The e2e drives a stub provider one HTTP hop out
+  (ADR-107), so everything below the socket is real.
 - **The hard rule.** _The LLM extracts; code decides._ The extraction prompt's return type emits
   attribute **slugs** with confidences and can never emit an attribute id or a chosen existing
   contact — so §4.8's rule is a compile-time fact rather than a checklist item. Matching free text
@@ -468,10 +501,10 @@ addition rather than a migration.
 
 | Later feature                             | What is already here                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Semantic search / embeddings**          | `search_document.embedding vector(1536)`, nullable and unindexed, plus `embedding_model` and `embedded_at`. The `search` API takes `mode` (`keyword` today). The HNSW index is created **after** the first backfill, never on an empty column; pgvector caps index dimensions at 2000 for `vector`, and 1536 fits                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Semantic search / embeddings**          | `search_document.embedding vector(1536)`, nullable and unindexed, plus `embedding_model` and `embedded_at`. `EmbeddingProvider` and a typed `embed()` exist and are fixture-tested; nothing calls them. The `search` API takes `mode` (`keyword` today). The HNSW index is created **after** the first backfill, never on an empty column; pgvector caps index dimensions at 2000 for `vector`, and 1536 fits. **`LLM_EMBEDDING_BASE_URL` defaults to OpenAI direct, not OpenRouter** — re-checked 2026-09-05, OpenRouter's catalogue lists no embedding models at all (ADR-106)                                                                                                                                                        |
 | **Synergy nudges (ask ↔ offer)**          | `asks` and `offers` are seeded tags from day one, and the demo seed plants twelve tags one person asks for and another offers. `follow_up.origin = 'system'` exists. The rule is recorded and non-negotiable: an introduction may only ever be suggested on an **exact ask↔offer match**, never on topic similarity                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **Stay-in-touch nudges**                  | `contact_metrics.warmth` answers "who matters" and `workspace.metrics_swept_at` is the freshness probe the nightly sweep writes as its last statement. The queue arrives with the importer in Stage 5 as `apps/api/src/jobs/` — a `JobQueue` port with an inline adapter first, pg-boss behind the same port later                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **Chat channels (Telegram, WhatsApp)**    | `quickCapture` and `ask` are registered operations with published schemas today (answering 501 until Stage 6) — a bot needs no other surface. `interaction.source` and `fact.source` already carry `telegram`, `whatsapp`, `quick_capture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Chat channels (Telegram, WhatsApp)**    | `ask` is built and `quickCapture` is registered with a published schema — a bot needs no other surface. `interaction.source` and `fact.source` already carry `telegram`, `whatsapp`, `quick_capture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **Voice input**                           | Quick capture takes plain text; a speech-to-text step prepends. Nothing to change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | **Gmail / Calendar sync**                 | `interaction.source` already includes `gmail` and `calendar`, and `createInteraction` accepts them, so an imported meeting is an ordinary `Interaction` and warmth picks it up with **no code change at all**. The provider interface (`fetchSince(cursor)`) and its `sync_state` table land in `apps/api/src/integrations/` when the first one is written                                                                                                                                                                                                                                                                                                                                                                              |
 | **Enrichment crawler**                    | `record.last_enriched_at` / `enriched_by`; per-value provenance already exists as `attribute_value.fact_id → fact`, so a crawled value is a fact with `source = 'crawler'` and `confidence < 1` and the conflict is _visible_ rather than lost                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -591,5 +624,14 @@ pnpm seed -- --assert-counts
 pnpm db:reproject           # rebuild every derived value from the fact log
 pnpm db:reproject -- --verify   # ...and prove it is byte-identical
 pnpm db:check               # the 10k × 60 measurement above
+pnpm openapi                # regenerate docs/openapi.json (CI asserts it matches)
+pnpm llm:relock             # rewrite apps/api/src/llm/prompts.lock.json (ADR-067)
+pnpm llm:record --prompt ask.filter   # ONE live, billable call -> fixtures/llm/
 pnpm verify                 # what CI runs: verify:static + verify:db
+pnpm verify:full            # ...plus verify:e2e
 ```
+
+`pnpm llm:record` is the only command in this repository that spends money, and it is never part of
+`verify`. `MUTUALS_LLM_LIVE=1 pnpm test:unit` is the other one: ADR-072's fourth layer, one live call
+against the ask prompt, skipped by default and skipped in CI, because secrets are unavailable to a
+pull request from a fork and a red build an outside contributor cannot fix is worse than no test.

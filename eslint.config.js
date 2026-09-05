@@ -21,7 +21,7 @@ export default tseslint.config(
   // tsconfig, and projectService would fail on them with "not found by the
   // project service" on the very first run.
   {
-    files: ['scripts/**/*.mjs', 'apps/*/scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'apps/*/scripts/**/*.mjs', 'e2e/support/**/*.mjs'],
     languageOptions: {
       globals: globals.node,
       ecmaVersion: 'latest',
@@ -82,6 +82,96 @@ export default tseslint.config(
             {
               name: '@mutuals/db',
               message: 'The dependency graph is one-way: db depends on core.',
+            },
+            {
+              name: '@mutuals/api',
+              message: 'The dependency graph is one-way: apps/api depends on core.',
+            },
+          ],
+          patterns: [
+            {
+              // ADR-071, the other direction. Nothing in the domain reaches a model, so its
+              // decisions stay testable with no network and no fixtures.
+              group: ['**/llm', '**/llm/**'],
+              message:
+                'ADR-071: the domain never calls a model. Extractor output enters core as plain ' +
+                'validated data.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  /**
+   * ADR-071: **no LLM calls in business logic**, enforced rather than written down.
+   *
+   * §4.8's rule -- the LLM extracts, code decides -- is exactly the kind of boundary that decays
+   * into a comment nobody enforces, in a repository future AI sessions will edit. So the LLM module
+   * is a zone: `packages/core` and `packages/db` may never reach it (which keeps duplicate
+   * matching, filter compilation and warmth unit-testable with no model, no network and no
+   * fixtures), and among the routes only the ones listed below by **exact path** may.
+   *
+   * Listing exact paths fails safe. Rename `routes/ask.ts` and the rule starts applying to it; CI
+   * goes red rather than the boundary quietly widening.
+   *
+   * `allowTypeImports` is on because `context.ts` has to name the client's type to declare the
+   * slot, and a type import compiles to nothing -- it cannot call a model.
+   */
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: [
+      'apps/api/src/llm/**',
+      // The three routes §4.8 gives a model to, by exact path. `quick-capture` and `summary` are
+      // Stage 6's second half; they are listed now so the rule is written once.
+      'apps/api/src/routes/ask.ts',
+      'apps/api/src/routes/quick-capture.ts',
+      'apps/api/src/routes/summary.ts',
+      // The process entry point constructs the one client, and the CLI tools record and lock
+      // prompts. Neither is business logic.
+      'apps/api/src/main.ts',
+      'apps/api/src/bin/**',
+      'apps/api/src/test-support/**',
+      // A test that proves the boundary has to be able to see both sides of it, and a test file
+      // ships nothing. The rule is about which production code paths may reach a model.
+      'apps/api/src/**/*.test.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/llm', '**/llm/**'],
+              allowTypeImports: true,
+              message:
+                'ADR-071: only the routes listed in eslint.config.js may call the LLM module. ' +
+                'Extractor output enters the domain as plain validated data.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  /** ADR-071, for the storage layer: the filter compiler and the write path never call a model. */
+  {
+    files: ['packages/db/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'fastify', message: 'packages/db must not know about HTTP.' },
+            {
+              name: '@mutuals/api',
+              message: 'The dependency graph is one-way: apps/api depends on db.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['**/llm', '**/llm/**'],
+              message: 'ADR-071: the storage layer never calls a model.',
             },
           ],
         },
