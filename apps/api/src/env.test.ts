@@ -37,7 +37,8 @@ describe('parseEnv', () => {
     expect(env.LOG_LEVEL).toBe('info')
     expect(env.DEFAULT_PHONE_REGION).toBe('DE')
     expect(env.DEFAULT_TIME_ZONE).toBe('Europe/Berlin')
-    expect(env.LLM_DAILY_COST_LIMIT_USD).toBe(2)
+    // Q7, answered 2026-09-05. A circuit breaker rather than a budget — see §14 and ADR-070.
+    expect(env.LLM_DAILY_COST_LIMIT_USD).toBe(5)
   })
 
   it('reads an empty value as unset, so `LLM_MODEL_ANSWER=` is not a model called ""', () => {

@@ -2493,10 +2493,18 @@ at startup when stale, on the condition that it is cheap. It is: 27 ms for the 1
 10,000 whose warmth can still move, and 0 ms when nothing is stale. It runs after the API is already
 serving, so it delays no request.
 
-**Q7 — LLM spending cap (Simon).** `LLM_DAILY_COST_LIMIT_USD` defaults to **$2.00/day**, enforced
-before every request to the model provider; past it, AI features return a clear "daily limit reached"
-message and everything else keeps working. Confirm the number, or name a different one. `0` disables
-the cap entirely, which I do not recommend for a key that lives in a `.env` on a laptop.
+**Q7 — LLM spending cap (Simon). ANSWERED 2026-09-05 — $5.00/day.** The recommendation was $2.00;
+Simon chose $5.00 after asking what the cap actually protects against, which is the right question.
+It is **a circuit breaker, not a budget**: ADR-070's own framing is "a bug that loops spends
+someone's real money", the key lives in a `.env` on a laptop, and the cap is checked immediately
+before every billable HTTP POST rather than once per task. $5.00 buys room to experiment while the
+model is still being chosen — and because the model is set per task at runtime (ADR-064), the spend
+this represents varies by roughly a factor of fifty depending on which one is picked, so a tighter
+number would have been false precision. `GET /api/v1/stats/llm` reports spend per day, per task and
+per prompt version, so the number can be revised from evidence rather than from a feeling. `0`
+disables the cap, which is not recommended. _Original wording:_ defaults to $2.00/day, enforced
+before every request to the model provider; past it, AI features return a clear "daily limit
+reached" message and everything else keeps working.
 
 _(One item is not a question but needs an acknowledgement: ADR-045 adds `phone_region` and `time_zone`
 to the Profile in §6.6. Both are needed — phone numbers like `089 1234567` cannot be normalised

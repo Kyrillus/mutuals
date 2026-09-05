@@ -79,9 +79,10 @@ questions in `docs/DECISIONS.md` §14; they are repeated here because they are e
   the prompt below. Stage 5 was run as two halves in one session and it worked, but only because
   every decision was written to `docs/DECISIONS.md` before the build rather than after.
 
-**One question is still open and Stage 6 is where it lands: Q7** — the LLM daily spending cap
-defaults to **$2.00/day** and nobody has confirmed that number. **Ask it in the first message of the
-Stage 6 session**, not later: it is the one input the LLM layer cannot be built without agreeing.
+**Q7 is answered: the LLM daily cap is $5.00** (Simon, 2026-09-05, `docs/DECISIONS.md` §14). He
+asked what the cap protects against before naming a number, which is the right question — it is a
+circuit breaker rather than a budget, and ADR-070 checks it before every billable request rather
+than once per task. **There are no open questions left.** Stage 6 can start without asking anything.
 
 **Q4 is answered and built** (Simon, 2026-09-04): a flagged duplicate is not silently pre-decided.
 The row is flagged and the user asked in as many words — _"this looks like a contact you already
@@ -176,9 +177,10 @@ Paste this as the first message of the new session:
 > Build **Stage 6 — the LLM layer and the command palette**. It splits in two; do the first half,
 > stop, and report.
 >
-> **Ask Q7 in your first reply and wait for the answer.** `LLM_DAILY_COST_LIMIT_USD` defaults to
-> $2.00/day and nobody has confirmed it. It is the one input this stage cannot be built without
-> agreeing, and `docs/DECISIONS.md` §14 has the framing. Everything else Stage 6 needs is settled.
+> **Nothing needs asking first.** Q7 is answered — the daily cap is $5.00 (§14) — and it is the last
+> question §14 had. ADR-070 is explicit that the cap is checked immediately before every billable
+> HTTP POST and not once per task: the naive placement let one user action bill six generations
+> through retries and repair, which is sixfold past what the setting says.
 >
 > **Session A — the LLM module and `ask`.** The provider client, the prompt registry, the cost cap,
 > the `llm_call` audit table (migration 0006, untouched since Stage 1) and §4.8's "ask the network":

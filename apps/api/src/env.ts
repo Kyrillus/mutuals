@@ -84,8 +84,15 @@ export const EnvSchema = z.object({
   LLM_MODEL_EXTRACTION: optionalText,
   LLM_MODEL_ANSWER: optionalText,
   LLM_MODEL_SUMMARY: optionalText,
-  /** A hard stop checked before every request. 0 disables the cap. */
-  LLM_DAILY_COST_LIMIT_USD: z.coerce.number().min(0).default(2),
+  /**
+   * A circuit breaker, not a budget (ADR-070, and Q7 answered 2026-09-05).
+   *
+   * Checked immediately before every billable HTTP POST rather than once per task — the naive
+   * placement let one user action bill up to six generations through retries and repair. $5.00 is
+   * Simon's number: small enough that a loop overnight is annoying rather than painful, large
+   * enough not to be hit while the model is still being chosen. 0 disables it.
+   */
+  LLM_DAILY_COST_LIMIT_USD: z.coerce.number().min(0).default(5),
 })
 
 export type Env = z.output<typeof EnvSchema>
