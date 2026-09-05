@@ -4,7 +4,7 @@ How the system is put together, what the dynamic-attribute layer actually does, 
 ten thousand contacts, and where each of the brief's §9 features plugs in.
 
 `docs/BRIEF.md` is the source of truth for product decisions and `docs/DECISIONS.md` is the binding
-technical specification (83 ADRs). This document explains and measures; where it disagrees with an
+technical specification (114 ADRs). This document explains and measures; where it disagrees with an
 ADR, the ADR wins and this document is wrong.
 
 ---
@@ -415,29 +415,51 @@ email is. The current behaviour is asserted by a test and named in a comment in
 
 ## 6. The LLM layer
 
-Built in Stage 6's first half: the module, the cost cap, the trace, and §4.8's "ask the network".
-Quick capture (§4.8), the on-demand summary (§6.5) and the ⌘K palette (§6.10) are the second half;
-`search` and `quickCapture` still answer a documented `501` with their real schemas in
-`docs/openapi.json`, so a client or an MCP adapter can be written against the final shape today.
+Built. Three prompts — `ask.filter`, `quick-capture.extract`, `contact.summary` — over one module,
+one transport, one trace and one cost cap. `search` is beside them and is deliberately _not_ an LLM
+route: §4.8's global search is a substring search Postgres already indexes three ways, and a palette
+that cost a model call per keystroke would be both slow and expensive.
 
 **It is one module, `apps/api/src/llm/`, and almost nothing may import it.** ESLint enforces it
-(ADR-071): `packages/core` and `packages/db` never, and among the routes only the ones listed by
-exact path — `ask.ts` today, `quick-capture.ts` and `summary.ts` in the second half. So duplicate
-matching, filter compilation and warmth **cannot** reach a model, and their decisions are
-unit-testable with no network and no fixtures. A probe confirms the rule fires in both directions.
+(ADR-071): `packages/core` and `packages/db` never, and among the routes only three, listed by exact
+path — `ask.ts`, `quick-capture.ts` and `summary.ts`. So duplicate matching, filter compilation and
+warmth **cannot** reach a model, and their decisions are unit-testable with no network and no
+fixtures. `boundary.test.ts` runs the real ESLint over both directions, because a
+`no-restricted-imports` zone is exactly the kind of configuration that survives a refactor in form
+and not in effect.
 
 ```
-   routes/ask.ts ──▶ llm/tasks/ask.ts ──▶ llm/client.ts ──▶ ChatProvider (port) ──▶ transport ──▶ OpenRouter
-        │                   │                   │                   ▲                    │
-        │                   │                   │                   └─ EmbeddingProvider ┘
-        │                   │                   ├──▶ llm/prompts/*.ts   versioned, locked by hash
-        │                   │                   ├──▶ llm/budget.ts      checked before every POST
-        │                   │                   └──▶ llm_call           one row per exchange
-        │                   ▼
-        │            packages/core      parseFilterSet · the resolver · the operator table
-        ▼
-   http/list.ts ──▶ the same compiled query the contacts table runs
+   routes/ask.ts ───────┐
+   routes/quick-capture ─┼─▶ llm/tasks/* ──▶ llm/client.ts ──▶ ChatProvider ──▶ transport ──▶ OpenRouter
+   routes/summary.ts ───┘        │                │                  ▲               │
+                                 │                │                  └ EmbeddingProvider
+                                 │                ├──▶ llm/prompts/*.ts   versioned, locked by hash
+                                 │                ├──▶ llm/budget.ts      checked before every POST
+                                 │                └──▶ llm_call           one row per exchange
+                                 ▼
+                          packages/core     parseFilterSet · the resolver · matchDuplicates
 ```
+
+**`routes/search.ts` is not on that diagram**, and that is the point: it is one SQL query over
+`sd_title_trgm_idx`, `identifier_value_trgm_idx` and `sd_tsv_idx`, merged and ranked **by kind of
+evidence before score** — an identifier beats a name beats a body, because someone typing `anna@` is
+naming a person exactly and someone whose meeting note says "anna" is not naming them at all.
+
+**One capture, end to end.** The model is handed the workspace's **writable** field list and answers
+in slugs, with a confidence each. `tasks/quick-capture.ts` checks every slug against the resolver and
+every value against the attribute registry — through `planAttributeWrites`, the same function an
+ordinary create goes through, so a preview cannot promise a write that would then fail — and then
+runs §4.6's deterministic `matchDuplicates` over what survived, with ADR-099's thresholds. A field
+the model got wrong is _dropped and named in the note_, never fatal. Confirming posts the edited
+preview to `commitQuickCapture`, which writes the contact, the organization, the link between them,
+the interaction and the follow-up in **one transaction** (ADR-109), then recomputes §4.7's derived
+columns — because a capture that logs a meeting has to move warmth exactly as the Activities tab
+does.
+
+**One summary.** `record_summary` is one row per contact, replaced on regenerate, carrying the model
+and the timestamp §6.5 asks for. A table rather than a read of the newest `llm_call` row, because
+`LLM_TRACE_BODIES=off` nulls `parsed` — using the trace as a cache would let a privacy switch delete
+every summary in the product (ADR-112).
 
 **One question, end to end.** The route loads the attribute definitions for contact _and_
 organization and hands the resolver's field list to the prompt — slugs, labels, types, operators and
@@ -504,7 +526,7 @@ addition rather than a migration.
 | **Semantic search / embeddings**          | `search_document.embedding vector(1536)`, nullable and unindexed, plus `embedding_model` and `embedded_at`. `EmbeddingProvider` and a typed `embed()` exist and are fixture-tested; nothing calls them. The `search` API takes `mode` (`keyword` today). The HNSW index is created **after** the first backfill, never on an empty column; pgvector caps index dimensions at 2000 for `vector`, and 1536 fits. **`LLM_EMBEDDING_BASE_URL` defaults to OpenAI direct, not OpenRouter** — re-checked 2026-09-05, OpenRouter's catalogue lists no embedding models at all (ADR-106)                                                                                                                                                        |
 | **Synergy nudges (ask ↔ offer)**          | `asks` and `offers` are seeded tags from day one, and the demo seed plants twelve tags one person asks for and another offers. `follow_up.origin = 'system'` exists. The rule is recorded and non-negotiable: an introduction may only ever be suggested on an **exact ask↔offer match**, never on topic similarity                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **Stay-in-touch nudges**                  | `contact_metrics.warmth` answers "who matters" and `workspace.metrics_swept_at` is the freshness probe the nightly sweep writes as its last statement. The queue arrives with the importer in Stage 5 as `apps/api/src/jobs/` — a `JobQueue` port with an inline adapter first, pg-boss behind the same port later                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **Chat channels (Telegram, WhatsApp)**    | `ask` is built and `quickCapture` is registered with a published schema — a bot needs no other surface. `interaction.source` and `fact.source` already carry `telegram`, `whatsapp`, `quick_capture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **Chat channels (Telegram, WhatsApp)**    | `ask`, `quickCapture` and `commitQuickCapture` are built — a bot needs no other surface, and the capture's preview/confirm split is exactly a chat exchange. `interaction.source` and `fact.source` already carry `telegram`, `whatsapp`, `quick_capture`                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **Voice input**                           | Quick capture takes plain text; a speech-to-text step prepends. Nothing to change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | **Gmail / Calendar sync**                 | `interaction.source` already includes `gmail` and `calendar`, and `createInteraction` accepts them, so an imported meeting is an ordinary `Interaction` and warmth picks it up with **no code change at all**. The provider interface (`fetchSince(cursor)`) and its `sync_state` table land in `apps/api/src/integrations/` when the first one is written                                                                                                                                                                                                                                                                                                                                                                              |
 | **Enrichment crawler**                    | `record.last_enriched_at` / `enriched_by`; per-value provenance already exists as `attribute_value.fact_id → fact`, so a crawled value is a fact with `source = 'crawler'` and `confidence < 1` and the conflict is _visible_ rather than lost                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |

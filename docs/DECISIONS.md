@@ -3414,3 +3414,178 @@ true` refuses a path that is not on disk, so `lintText` returned a parsing error
 **One assumption that held.** ADR-072 named undici's `MockAgent` as the same-day fallback if msw's
 fetch interception misbehaved under Node 24. It does not: seventeen contract tests over the real
 transport pass, including the total-deadline assertion that counts requests.
+
+## 18. Stage 6, second half — quick capture, the summary and the palette
+
+Five decisions, and what the build found. Where the first half was mostly engine, this half is
+mostly _product_ — so most of these are about what the user is shown and what they are asked, and
+two of them are about not spending money by accident.
+
+### ADR-109 — Confirming a capture is one operation, and the preview writes nothing
+
+**Context.** §4.8: "shown as an editable preview that the user confirms with one click. Nothing is
+saved before confirmation." §7: "every operation the UI performs must be a single, well-named API
+operation, not a sequence of UI-only calls."
+
+**Options.** (1) The preview returns a proposal and the client posts it back through
+`createContact`, `createOrganization`, `createInteraction` and `createFollowUp` in order. (2) A
+second operation, `commitQuickCapture`, that writes all four in one transaction. (3) One operation
+that extracts _and_ writes, with an `?apply=true` flag.
+
+**Choice.** Option 2. `quickCapture` reads and writes nothing; `commitQuickCapture` writes.
+
+**Consequences.** Option 1 is exactly the sequence §7 names, and it is not merely inelegant: the
+order is forced (the organization before the contact, because the contact's relation field needs its
+id; the contact before the follow-up, because a follow-up hangs off one), and a client that got half
+way would leave a contact with no meeting and no way to tell. A single transaction rolls back
+instead, which is what "nothing is saved before confirmation" has to mean on the write side. It also
+makes the whole feature one call for a Telegram bot, which §9 says is the point of these two
+endpoints existing at all. Option 3 collapses the preview, which is the feature.
+
+**The `created` array is the confirmation.** It says which of the four were new, so the toast can
+read "Saved contact, interaction, follow-up" rather than "Saved" — the difference between a user
+knowing what happened and trusting that something did.
+
+**Two rules the commit enforces itself**, because they are true regardless of what the model said: a
+follow-up with no contact is refused (§4.1 gives it nowhere to hang), and an entirely empty
+confirmation is refused rather than answering 201 with nothing.
+
+### ADR-110 — The capture proposes slugs; the preview is the workspace's own fields
+
+**Context.** The one rule: attribute definitions drive everything, never hard-code a column. A
+capture is the most tempting place to break it — `{ firstName, email, company }` is the obvious
+extraction shape and it is wrong in a product where the user invents the fields.
+
+**Choice.** The prompt is handed the resolver's **writable** field list and answers in it:
+`{ slug, value, confidence }`. The preview renders `label` from the definition. The commit splits
+system columns from attributes by asking the resolver which is which.
+
+**Consequences.** A field created five minutes ago can be filled by a capture, a field renamed last
+week still works, and a derived column can never be proposed — `readOnly` decides, so a new derived
+column is excluded on the day it is added rather than the day someone remembers. The **confidence**
+per field is the one thing this shape adds beyond the ask prompt's: a capture is a guess about a
+sentence typed in a hurry, and the preview marks anything under 0.6 as "unsure" so the eye goes
+there first.
+
+**A field the model gets wrong is dropped, not fatal.** An unknown slug, a value the registry
+refuses, an interaction type nobody declared, a date that will not parse — each is removed and named
+in the `note`. Refusing the whole capture because one date was "next Tuesday-ish" would throw away
+four good proposals to punish one bad one, and the user is looking at a preview where the missing
+field is a second's work to add.
+
+**And the name fields are filled from `displayName` when the model omits them.** Without it the card
+is headed "Anna Berger" and the payload behind it has no name in it — the preview and what it writes
+have to be the same thing.
+
+### ADR-111 — Matching reuses the importer's matcher; organizations still match exactly
+
+**Context.** §4.8's capture has to say whether "Anna Berger" is somebody already in the workspace.
+§4.6 has a whole matcher for that, and ADR-099 moved its thresholds in Stage 5 on measured evidence.
+
+**Choice.** `probeDuplicates` + `matchDuplicates`, unchanged, with ADR-099's thresholds. Organizations
+match **exactly** on the normalised name, as ADR-101 decided for the importer.
+
+**Consequences.** A typo in a name typed at a conference and a typo in a name exported from LinkedIn
+are the same problem; two answers to it would be the bug. The asymmetry for organizations is
+inherited for the same reason it was chosen: "Kiln Robotics" and "Kiln Robotics GmbH" are two
+records by design, and §6.9's merge is where an inexact match belongs — a decision, not a side
+effect of a capture.
+
+**The preview offers every candidate, not just the winner** (§6.10: "with a way to change the
+match"), each with the evidence that produced it — _"Same email: anna@northstar.vc"_ — plus "Create a
+new contact" as an explicit option. A capture that silently attached a meeting to the wrong Anna
+would be worse than one that asked, and the wrong Anna is exactly what a `possible` band means.
+
+### ADR-112 — The summary is its own table, and generating it is its own operation
+
+**Context.** §6.5: "generated on demand via a button and cached with a timestamp, with a regenerate
+action; shows an empty state until generated."
+
+**Options for the cache.** (1) Read the newest successful `llm_call` row for the record — the index
+`llm_call_record_idx` already exists and makes it one lookup. (2) A `record_summary` table.
+(3) A column on `contact_metrics`.
+
+**Choice.** Option 2, migration 0011.
+
+**Consequences.** Option 1 is tempting and wrong: `LLM_TRACE_BODIES=off` nulls `parsed`, so a
+**privacy switch would silently delete every summary in the product**. The trace is a trace. Option 3
+puts an LLM-written string in the table the nightly sweep rewrites, which is a different lifetime.
+One row per record, replaced on regenerate — history is not wanted, because a summary is a rendering
+of the facts rather than an observation about the world, and `fact` is where observations live.
+
+**`getContactSummary` and `generateContactSummary` are two operations** because they cost very
+different things: the read is one indexed lookup and runs on every visit to a contact's page, the
+write spends money. Folding the summary into `getContact` would have put a billable feature behind
+every read of every contact, list included — which is how a $5.00 daily cap gets spent by scrolling.
+`llm_call_id` points the summary at the call that wrote it, and is `ON DELETE SET NULL`: pruning the
+trace must never delete the product.
+
+### ADR-113 — The palette opens the app's own dialogs, and the sidebar box became a button
+
+**Context.** §6.10: "⌘K opens a command palette: search across records, plus actions: New contact,
+New organization, New follow-up, New interaction, Quick capture, Go to Settings."
+
+**Choice.** The four create actions render `AddRecordDialog`, `FollowUpDialog` and
+`InteractionDialog` — the same components the pages open. The sidebar's search input became a
+**button** that opens the palette.
+
+**Consequences.** A second "Add contact" dialog reachable only from ⌘K is the kind of duplicate that
+drifts for six months and is then found by a user asking why one of them has a field the other does
+not. All three already took `open` / `onOpenChange` because each was already opened from more than
+one place, so this cost nothing.
+
+`InteractionDialog` needed one change: `recordId` is now optional, and without one the dialog asks
+through the same `ContactPicker` the follow-up dialog uses. An interaction belongs to somebody
+(§4.1), so "New interaction" from a palette is a question before it is a form.
+
+The sidebar box reads as an input and is not one. Typing into a sidebar box and having the results
+appear in a dialog would be two places to look; one control that opens the one place search happens
+is the honest version. The shortcut moved to the provider, so ⌘K now works on every page rather than
+only where that component is mounted.
+
+**Search ranks by kind of evidence before it ranks by score.** An identifier is an exact claim about
+who somebody is, a name is an approximate one, and a body that happens to contain the word is not a
+claim at all. One merged score would put a strong trigram hit on a meeting note above an exact email
+— which is the ordering a palette must not have, because the palette is how you jump to a person you
+already have in mind. Asserted in `search.db.test.ts` rather than left to the query planner.
+
+### ADR-114 — What the second half settled, and the five bugs
+
+**Two decisions taken in code.**
+
+**Migration 0011 adds `identifier_value_trgm_idx`.** §4.8 asks for substring search across emails,
+and `identifier_uq` is a btree on `(workspace_id, kind, value)` which cannot serve
+`value LIKE '%anna%'` at all — a leading wildcard is not a prefix. Without the index the palette's
+third probe is a sequential scan of every identifier on every keystroke.
+
+**The lock file is now enforced.** ADR-067 said "from the end of Stage 6", and this is it:
+`LOCK_ENFORCED` in `lock.test.ts` is `true`, so a prompt edited without `pnpm llm:relock` fails CI.
+Three prompts are locked — `ask.filter`, `quick-capture.extract` and `contact.summary`.
+`PLANNED_PROMPTS` and `PLANNED_OPERATIONS` are both empty again.
+
+**Five bugs, and the two that were silent are the ones worth reading.**
+
+- **A capture did not move the relationship numbers.** Logging a meeting through the Activities tab
+  recomputes `last_interaction_at`, `interaction_count_12m` and warmth (ADR-092); the capture's
+  commit did not, so the detail page showed "Last interaction —" directly above the interaction it
+  had just written. Found by running the flow, not by a test. `recomputeMetrics` now runs after the
+  transaction — _after_, because inside it the sweep would compute from a snapshot that does not yet
+  contain the row it is meant to be counting.
+- **The fix for it silently did not apply.** The edit was written against a version of the file that
+  Prettier had since reformatted onto three lines, so the string replacement matched nothing and
+  reported success — the import it added landed, the code it was for did not. The regression test
+  written _before_ the fix is the only reason this was caught within a minute rather than at the end.
+  A find-and-replace that matches nothing is a silent failure the same way `jsonb_set` on a missing
+  key was in Stage 5 (ADR-100).
+- **A backtick inside a SQL template literal ends the template.** Twice, in the same file: the
+  house comment style writes `` `mutuals_norm` `` in prose, and inside a `` sql`…` `` tag that closes
+  the string. It is a parse error rather than a silent one, but it cost two round trips and is worth
+  writing down because the comment style and the query style are both correct on their own.
+- **An uncast parameter in `$1 is null` fails at prepare time.** Postgres cannot infer the type, so
+  the whole search query 500s with a message pointing nowhere near the workspace filter. `::uuid`
+  fixes it; the symptom was every search test failing at once with an internal error.
+- **⌘K in an e2e fires before React has mounted.** `page.goto` resolves before the effect that
+  registers the listener has run, so a real keydown is delivered to nothing and the failure reads
+  exactly like a broken shortcut. Three specs failed against a palette that worked perfectly in a
+  browser. The fix is to wait for the shell's own search control first, which is a real signal
+  rather than a sleep.

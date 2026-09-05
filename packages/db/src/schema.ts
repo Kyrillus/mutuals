@@ -559,6 +559,18 @@ export const SCHEMA = {
     updated_at: col('timestamptz', { default: true }),
   },
 
+  // -- 0011 ------------------------------------------------------------------------------------
+
+  record_summary: {
+    record_id: col('uuid'),
+    workspace_id: col('uuid', { null: true }),
+    summary: col('text'),
+    model: col('text'),
+    prompt_version: col('int4'),
+    llm_call_id: col('uuid', { null: true }),
+    generated_at: col('timestamptz', { default: true }),
+  },
+
   // -- Kysely's own ledger ----------------------------------------------------------------------
   // Present because `assertSchemaCurrent` reads it through the query builder, and because a table
   // absent from `SCHEMA` fails the drift test.

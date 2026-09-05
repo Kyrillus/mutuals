@@ -62,6 +62,9 @@ pnpm seed         # ~200 contacts, 60 organizations, 500 interactions, 40 follow
 pnpm verify       # what CI runs: verify:static + verify:db
 pnpm verify:e2e   # build, migrate mutuals_e2e, Playwright (its own CI job)
 pnpm verify:full  # ...all three
+pnpm openapi      # regenerate docs/openapi.json; CI fails if it differs
+pnpm llm:relock   # rewrite the prompt lock after editing a prompt (ADR-067); CI enforces it
+pnpm llm:record   # ONE live, billable model call, written to fixtures/llm/. Never in CI.
 ```
 
 The e2e suite drives a **built** SPA on ports 3200/3201, never the dev server on 3000/3001 — it
@@ -90,8 +93,12 @@ either. `docs/HANDOFF.md` has the rest of the environment notes.
    auto-mapping, duplicate detection against records _and_ within one file, and §6.9's merge for
    contacts and organizations. **Done**, in PR #1 (ADR-089); ADR-095 to ADR-101 record what it
    settled.
-6. **LLM layer (ask, quick capture, summaries) + command palette** ← _current_
-7. Polish and `v0.1.0`
+6. ~~**LLM layer (ask, quick capture, summaries) + command palette**~~ — the `llm/` module over an
+   OpenAI-compatible port, the cost cap checked before every billable request, the `llm_call` trace,
+   §4.8's "ask the network" with the filter it ran, §4.8's quick capture with an editable preview,
+   §6.5's on-demand summary and §6.10's ⌘K palette over the new `search`. **Done**, in PR #1
+   (ADR-089); ADR-102 to ADR-114 record what it settled.
+7. **Polish and `v0.1.0`** ← _current_
 
 Each stage ends with green CI, updated docs, a PR and a stop for approval.
 

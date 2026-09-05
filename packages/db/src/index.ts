@@ -55,6 +55,7 @@ export * from './repositories/duplicates.ts'
 export * from './repositories/imports.ts'
 export * from './repositories/llm.ts'
 export * from './repositories/records.ts'
+export * from './repositories/search.ts'
 export * from './repositories/views.ts'
 
 // The derived columns of §4.7. `apps/api` recomputes them, scoped, whenever an interaction moves

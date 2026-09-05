@@ -51,32 +51,30 @@ describe('the middleware slot', () => {
 
 describe('the Stage-6 operations', () => {
   /**
-   * `ask` is built (§4.8) and has its own suite in `routes/ask.db.test.ts`. These two are the
-   * second half's, and they keep answering the documented 501 they have answered since Stage 1 —
-   * which is the point of ADR-031's list: the surface is reviewable before the engine is fitted.
+   * All three are built (§4.8, §6.10). What is left worth asserting here is that the surface is
+   * *reachable* — `routes/ask.db.test.ts`, `search.db.test.ts` and `quick-capture.db.test.ts` cover
+   * what each one does — and that a request is refused before anything billable happens.
    */
-  for (const [method, url, payload] of [
-    ['GET', '/api/v1/search?q=anna', undefined],
-    ['POST', '/api/v1/quick-capture', { text: 'Met Anna at Bits & Pretzels' }],
-  ] as const) {
-    it(`answers a documented 501 for ${method} ${url}`, async () => {
-      const app = await getTestApp()
-      const response = await app.inject({
-        method,
-        url,
-        ...(payload === undefined ? {} : { payload }),
-      })
-      expect(response.statusCode).toBe(501)
-      expect(response.headers['content-type']).toContain('application/problem+json')
-      const problem = JSON.parse(response.body) as { type: string; detail: string }
-      expect(problem.type).toContain('#not_implemented')
-      expect(problem.detail).toContain('Stage 6')
-    })
-  }
+  it('registers all three, none of them answering 501 any more', async () => {
+    const app = await getTestApp()
+    // A Set, because Fastify registers a HEAD route beside every GET and both carry the operation
+    // id — so `/search` legitimately appears twice in the registration log.
+    const urls = new Set(
+      app.routeOperations
+        .filter((route) => ['search', 'ask', 'quickCapture'].includes(route.operationId ?? ''))
+        .map((route) => route.url),
+    )
+    expect([...urls].sort()).toEqual(['/api/v1/ask', '/api/v1/quick-capture', '/api/v1/search'])
+  })
 
   it('validates an ask before spending anything on it', async () => {
     // A 400 from the schema, not a model call: an empty question costs nothing to refuse.
     const { status } = await api.post('/api/v1/ask', { question: '' })
+    expect(status).toBe(400)
+  })
+
+  it('validates a quick capture the same way', async () => {
+    const { status } = await api.post('/api/v1/quick-capture', { text: '' })
     expect(status).toBe(400)
   })
 })

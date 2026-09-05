@@ -72,6 +72,159 @@
         "required": ["understood", "objectType", "filters", "subject", "declineReason"],
         "additionalProperties": false
       }
+    },
+    {
+      "id": "contact.summary",
+      "version": 1,
+      "taskKind": "summary",
+      "promptHash": "e0058e0216e5ae275076a908e93390300fe910b87390203e1198b84aa44c8854",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "quick-capture.extract",
+      "version": 1,
+      "taskKind": "extraction",
+      "promptHash": "5985cd39f35e34adc95e81714bfb9a1214d27bfa26d1a6c96799193d494c35ac",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["slug", "value", "confidence"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["displayName", "fields"],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["slug", "value", "confidence"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["displayName", "fields"],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interaction": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": ["string", "null"]
+                  },
+                  "occurredOn": {
+                    "type": ["string", "null"]
+                  }
+                },
+                "required": ["type", "title", "body", "occurredOn"],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "followUp": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "dueOn": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": ["string", "null"]
+                  }
+                },
+                "required": ["title", "dueOn", "notes"],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["contact", "organization", "interaction", "followUp", "note"],
+        "additionalProperties": false
+      }
     }
   ]
 }

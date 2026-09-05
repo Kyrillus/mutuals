@@ -57,9 +57,11 @@ they do not count against this.
 
 ### not_implemented
 
-**501.** The route is documented in the OpenAPI schema and does not do anything yet. `search`, `ask`
-and `quick-capture` return this until Stage 6. It is deliberate rather than a 404, so a client can
-tell "planned" apart from "wrong URL".
+**501.** The route is documented in the OpenAPI schema and does not do anything yet — deliberate
+rather than a 404, so a client can tell "planned" apart from "wrong URL". `search`, `ask` and
+`quick-capture` answered this from Stage 1 until Stage 6 built them; **no route returns it today**.
+The code stays because the pattern is how this API publishes a shape before fitting the engine, and
+the next planned operation will use it again.
 
 ### internal_error
 

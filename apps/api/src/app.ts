@@ -38,6 +38,7 @@ import { quickCaptureRoutes } from './routes/quick-capture.ts'
 import { recordRoutes } from './routes/records.ts'
 import { searchRoutes } from './routes/search.ts'
 import { settingsRoutes } from './routes/settings.ts'
+import { summaryRoutes } from './routes/summary.ts'
 import { viewRoutes } from './routes/views.ts'
 
 export const API_PREFIX = '/api/v1'
@@ -185,6 +186,7 @@ export async function buildApp(ctx: AppContext, options: BuildOptions = {}): Pro
       await instance.register(askRoutes, { ctx })
       await instance.register(searchRoutes, { ctx })
       await instance.register(quickCaptureRoutes, { ctx })
+      await instance.register(summaryRoutes, { ctx })
     },
     { prefix: API_PREFIX },
   )

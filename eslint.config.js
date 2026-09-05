@@ -122,8 +122,9 @@ export default tseslint.config(
     files: ['apps/api/src/**/*.ts'],
     ignores: [
       'apps/api/src/llm/**',
-      // The three routes §4.8 gives a model to, by exact path. `quick-capture` and `summary` are
-      // Stage 6's second half; they are listed now so the rule is written once.
+      // The three routes §4.8 and §6.5 give a model to, by exact path. Everything else in
+      // `routes/` -- including `search.ts`, which the palette calls on every keystroke -- is
+      // refused, and `boundary.test.ts` asserts both directions.
       'apps/api/src/routes/ask.ts',
       'apps/api/src/routes/quick-capture.ts',
       'apps/api/src/routes/summary.ts',

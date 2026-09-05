@@ -4,7 +4,10 @@
     {
       "name": "mutuals",
       "runtimeExecutable": "/bin/zsh",
-      "runtimeArgs": ["-lc", "unset PORT; exec node scripts/dev.mjs"],
+      "runtimeArgs": [
+        "-lc",
+        "unset PORT; export LLM_BASE_URL=http://127.0.0.1:3202 OPENROUTER_API_KEY=local-stub-key; exec node scripts/dev.mjs"
+      ],
       "port": 3000
     }
   ]

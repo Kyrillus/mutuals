@@ -17,6 +17,8 @@
  * the transport, the retry policy, `usage.cost`, the strict `response_format`, the Zod
  * re-validation, `buildFilterSet`, the query compiler and the `llm_call` trace. Only the model's
  * judgement is faked, and the model's judgement is the one thing an e2e cannot assert anyway.
+ *
+ * It answers all three of Stage 6's prompts, keyed on the strict schema name the transport sends.
  */
 import { createServer } from 'node:http'
 
@@ -85,6 +87,63 @@ const SCRIPT = [
 const DEFAULT = answer({ subject: 'everyone', filters: [] })
 
 /**
+ * The other two prompts, keyed the same way the transport identifies them: the strict
+ * `response_format.json_schema.name`, which is `<prompt id>_v<version>` (`schemaNameOf`). Branching
+ * on that rather than on the prompt text means a reworded prompt does not silently start getting
+ * the wrong canned answer.
+ */
+function field(slug, value, confidence = 0.9) {
+  return { slug, value, confidence }
+}
+
+function captureReply(note) {
+  if (/nothing|milk/i.test(note)) {
+    return {
+      contact: null,
+      organization: null,
+      interaction: null,
+      followUp: null,
+      note: 'Nothing here names a person.',
+    }
+  }
+
+  return {
+    contact: {
+      displayName: 'Anna Berger',
+      fields: [
+        field('first_name', 'Anna', 1),
+        field('last_name', 'Berger', 1),
+        field('city', 'Munich', 0.5),
+        field('asks', 'climate-tech seed deals', 0.8),
+      ],
+    },
+    organization: {
+      displayName: 'Northstar Ventures',
+      fields: [field('name', 'Northstar Ventures', 1)],
+    },
+    interaction: {
+      type: 'Meeting',
+      title: 'Bits & Pretzels',
+      body: 'Looking for climate-tech seed deals.',
+      occurredOn: null,
+    },
+    followUp: { title: 'Follow up with Anna', dueOn: '2026-12-31', notes: null },
+    note: null,
+  }
+}
+
+const SUMMARY = {
+  summary:
+    'An investor at Northstar Ventures in Munich. Currently looking for climate-tech seed deals.',
+}
+
+function replyFor(schemaName, message) {
+  if (schemaName.startsWith('quick_capture_extract')) return captureReply(message)
+  if (schemaName.startsWith('contact_summary')) return SUMMARY
+  return reply(message)
+}
+
+/**
  * The **question**, not the whole user message.
  *
  * The rendered prompt ends with `Question: …` and begins with `Today is 2026-09-05 in
@@ -117,11 +176,14 @@ const server = createServer((request, response) => {
   let body = ''
   request.on('data', (chunk) => (body += chunk))
   request.on('end', () => {
-    let question
+    let message
+    let schemaName = ''
     try {
-      question = String(JSON.parse(body).messages?.at(-1)?.content ?? '')
+      const parsed = JSON.parse(body)
+      message = String(parsed.messages?.at(-1)?.content ?? '')
+      schemaName = String(parsed.response_format?.json_schema?.name ?? '')
     } catch {
-      question = ''
+      message = ''
     }
 
     response.writeHead(200, { 'content-type': 'application/json' })
@@ -130,7 +192,11 @@ const server = createServer((request, response) => {
         id: 'gen-e2e',
         model: 'stub/model',
         provider: 'e2e-stub',
-        choices: [{ message: { role: 'assistant', content: JSON.stringify(reply(question)) } }],
+        choices: [
+          {
+            message: { role: 'assistant', content: JSON.stringify(replyFor(schemaName, message)) },
+          },
+        ],
         // A real cost, so the e2e exercises ADR-070's counter rather than the unreported branch.
         usage: { prompt_tokens: 900, completion_tokens: 60, cost: 0.000_42 },
       }),

@@ -6,18 +6,24 @@
  * this array exists to make impossible.
  */
 import { askFilterPrompt } from './ask-filter.ts'
+import { contactSummaryPrompt } from './contact-summary.ts'
+import { quickCapturePrompt } from './quick-capture.ts'
 import { registered, type RegisteredPrompt } from './spec.ts'
 
-export const PROMPTS: readonly RegisteredPrompt[] = [registered(askFilterPrompt)]
+export const PROMPTS: readonly RegisteredPrompt[] = [
+  registered(askFilterPrompt),
+  registered(quickCapturePrompt),
+  registered(contactSummaryPrompt),
+]
 
 /**
- * The prompts Stage 6's second half adds: quick capture (§4.8) and the contact summary (§6.5).
+ * Prompts a later stage will add.
  *
- * Written down for the same reason `PLANNED_OPERATIONS` is: the complete surface stays reviewable
- * while half of it does not exist yet, and `prompts.test.ts` asserts the two lists are disjoint so
- * a prompt cannot quietly be registered under a second id.
+ * **Empty as of Stage 6.** All three of §4.8's and §6.5's are registered. The array stays for the
+ * same reason `PLANNED_OPERATIONS` does: `prompts.test.ts` asserts the two lists are disjoint, and
+ * that guard is what keeps a planned name from quietly becoming a second registered id.
  */
-export const PLANNED_PROMPTS = ['quick-capture.extract', 'contact.summary'] as const
+export const PLANNED_PROMPTS = [] as const
 
 export function promptById(id: string): RegisteredPrompt | undefined {
   return PROMPTS.find((prompt) => prompt.id === id)
@@ -25,3 +31,5 @@ export function promptById(id: string): RegisteredPrompt | undefined {
 
 export * from './spec.ts'
 export * from './ask-filter.ts'
+export * from './contact-summary.ts'
+export * from './quick-capture.ts'

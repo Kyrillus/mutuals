@@ -73,6 +73,8 @@ export const SearchResponseSchema = z.object({
 /** The two object types a question can be about. Interactions are reached *through* a contact. */
 export const AskObjectTypeSchema = z.enum(['contact', 'organization'])
 
+export type SearchResponse = z.output<typeof SearchResponseSchema>
+
 export const AskRequestSchema = z.object({
   question: z.string().min(1).max(2000),
   /** Pins the table. Left out, the model chooses, and `objectType` in the answer says which. */
@@ -111,20 +113,131 @@ export const QuickCaptureRequestSchema = z.object({
 })
 
 /**
- * Nothing is saved before confirmation (§4.8), so this is a *preview*: every element says whether
- * it would be created or matched onto an existing record, and the client posts the confirmed
- * version back through the ordinary create operations.
+ * One proposed value for one field, named by **slug**.
+ *
+ * Not `{ firstName, email, city }`. The model is handed the workspace's own field list and answers
+ * in it, so a field invented this morning is fillable and a field renamed last week still works —
+ * which is the one rule, applied to the one place a model could break it (ADR-067).
+ */
+export const CaptureFieldSchema = z.object({
+  slug: z.string(),
+  /** The field's title at the time of the capture, so the preview needs no second lookup. */
+  label: z.string(),
+  value: z.string(),
+  /** 0–1, as the model reported it. The preview marks anything it is unsure about. */
+  confidence: z.number().min(0).max(1),
+})
+
+/** One record the matcher thinks this might already be (§4.6). */
+export const CaptureMatchSchema = z.object({
+  id: UuidSchema,
+  displayName: z.string(),
+  confidence: z.number(),
+  band: z.enum(['certain', 'probable', 'possible']),
+  /** "Same email: anna@northstar.vc" — the chip tells the user *why*. */
+  evidence: z.string(),
+})
+
+/**
+ * A proposed contact or organization.
+ *
+ * §6.10: "The preview must make clear which records are new and which are matched existing (with a
+ * way to change the match)" — hence `action`, `matchId` and the full `candidates` list rather than
+ * just the winner.
+ */
+export const CaptureRecordSchema = z.object({
+  action: z.enum(['create', 'match']),
+  matchId: UuidSchema.nullable(),
+  displayName: z.string(),
+  fields: z.array(CaptureFieldSchema),
+  candidates: z.array(CaptureMatchSchema),
+})
+
+export type CaptureField = z.output<typeof CaptureFieldSchema>
+export type CaptureMatch = z.output<typeof CaptureMatchSchema>
+export type CaptureRecord = z.output<typeof CaptureRecordSchema>
+
+export const CaptureInteractionSchema = z.object({
+  type: z.string(),
+  title: z.string(),
+  body: z.string().nullable(),
+  occurredAt: IsoDateTimeSchema,
+})
+
+export const CaptureFollowUpSchema = z.object({
+  title: z.string(),
+  dueAt: CivilDateSchema,
+  notes: z.string().nullable(),
+})
+
+/**
+ * Nothing is saved before confirmation (§4.8), so this is a *preview*. The client edits it and
+ * posts it back to `commitQuickCapture`, which is one operation rather than four calls — §7 asks
+ * that every action the UI performs be a single named operation, and confirming a capture is one
+ * action however many rows it turns into.
  */
 export const QuickCaptureResponseSchema = z.object({
-  contact: z
-    .object({ action: z.enum(['create', 'match']), matchId: UuidSchema.nullable() })
-    .nullable(),
-  organization: z
-    .object({ action: z.enum(['create', 'match']), matchId: UuidSchema.nullable() })
-    .nullable(),
-  interaction: z.unknown().nullable(),
-  followUp: z.unknown().nullable(),
+  contact: CaptureRecordSchema.nullable(),
+  organization: CaptureRecordSchema.nullable(),
+  interaction: CaptureInteractionSchema.nullable(),
+  followUp: CaptureFollowUpSchema.nullable(),
+  /**
+   * What the model could not place, in its own words, or `null`.
+   *
+   * It exists so nothing the user typed disappears without being accounted for. A capture that
+   * silently drops half a sentence is worse than one that says which half.
+   */
+  note: z.string().nullable(),
 })
+
+export type QuickCaptureResponse = z.output<typeof QuickCaptureResponseSchema>
+
+/** The confirmed preview, as edited. Values are strings on the wire, like every other write. */
+export const CommitCaptureRecordSchema = z.object({
+  action: z.enum(['create', 'match']),
+  /** Required when `action` is `match`; ignored otherwise. */
+  matchId: UuidSchema.nullish(),
+  fields: z
+    .array(z.object({ slug: z.string().min(1).max(64), value: z.string().max(10_000) }))
+    .max(200),
+})
+
+export const CommitQuickCaptureSchema = z.object({
+  contact: CommitCaptureRecordSchema.nullish(),
+  organization: CommitCaptureRecordSchema.nullish(),
+  interaction: CaptureInteractionSchema.nullish(),
+  followUp: CaptureFollowUpSchema.nullish(),
+})
+
+/** What actually landed. `created` is what the confirmation toast counts. */
+export const CommitQuickCaptureResponseSchema = z.object({
+  contact: RecordRefSchema.nullable(),
+  organization: RecordRefSchema.nullable(),
+  interactionId: UuidSchema.nullable(),
+  followUpId: UuidSchema.nullable(),
+  created: z.array(z.enum(['contact', 'organization', 'interaction', 'followUp'])),
+  /** True when the contact was linked to the organization through a relation field. */
+  linked: z.boolean(),
+})
+
+export type CommitQuickCapture = z.output<typeof CommitQuickCaptureSchema>
+export type CommitQuickCaptureResponse = z.output<typeof CommitQuickCaptureResponseSchema>
+
+// -- §6.5's on-demand summary --------------------------------------------------------------------
+
+/**
+ * §6.5: "generated on demand via a button and cached with a timestamp, with a regenerate action;
+ * shows an empty state until generated". So `summary` is nullable and `generatedAt` says how old
+ * the text is — a summary written before three meetings happened is not wrong, it is stale, and
+ * only the timestamp can tell the reader which.
+ */
+export const ContactSummarySchema = z.object({
+  summary: z.string().nullable(),
+  generatedAt: IsoDateTimeSchema.nullable(),
+  model: z.string().nullable(),
+})
+
+export type ContactSummary = z.output<typeof ContactSummarySchema>
 
 // -- What the LLM layer costs (ADR-070) ----------------------------------------------------------
 

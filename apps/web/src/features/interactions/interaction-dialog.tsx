@@ -5,6 +5,10 @@
  * the attribute registry's date control is civil-date only by design. The value is converted
  * through the profile's timezone rather than the browser's, so logging a call at 23:30 from a
  * laptop set to UTC does not file it on the wrong day.
+ *
+ * `recordId` is optional so §6.10's palette can open this with nobody chosen. An interaction
+ * belongs to somebody (§4.1), so without one the dialog asks — through the same `ContactPicker` the
+ * follow-up dialog uses, rather than a second search box that behaves almost the same.
  */
 import { INTERACTION_TYPES, type Interaction, type InteractionType } from '@mutuals/core'
 import { useEffect, useState } from 'react'
@@ -20,6 +24,8 @@ import {
   DialogTitle,
 } from '@/ui/dialog.tsx'
 import { Input } from '@/ui/input.tsx'
+
+import { ContactPicker, type PickedContact } from '@/features/follow-ups/contact-picker.tsx'
 
 import { useCreateInteraction, useUpdateInteraction } from './use-interactions.ts'
 
@@ -48,14 +54,19 @@ export function InteractionDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  recordId: string
+  /** Whose timeline to invalidate. Absent when the dialog is opened without a record in hand. */
+  recordId?: string
   contactId?: string
   organizationId?: string
   editing?: Interaction | null
 }) {
   const { timeZone } = useDisplay()
-  const create = useCreateInteraction(recordId)
-  const update = useUpdateInteraction(recordId)
+  const [picked, setPicked] = useState<PickedContact | null>(null)
+
+  // Whichever contact this is about: the one the caller fixed, or the one just chosen.
+  const subjectId = recordId ?? picked?.id
+  const create = useCreateInteraction(subjectId ?? '')
+  const update = useUpdateInteraction(subjectId ?? '')
 
   const [type, setType] = useState<InteractionType>('Meeting')
   const [title, setTitle] = useState('')
@@ -69,6 +80,7 @@ export function InteractionDialog({
     setTitle(editing?.title ?? '')
     setBody(editing?.body ?? '')
     setWhen(toLocalInput(editing?.occurredAt ?? new Date().toISOString(), timeZone))
+    setPicked(null)
   }, [open, editing, timeZone])
 
   const busy = create.isPending || update.isPending
@@ -96,10 +108,11 @@ export function InteractionDialog({
       return
     }
 
+    const participant = contactId ?? picked?.id
     create.mutate(
       {
         ...payload,
-        ...(contactId === undefined ? {} : { contactIds: [contactId] }),
+        ...(participant === undefined ? {} : { contactIds: [participant] }),
         ...(organizationId === undefined ? {} : { organizationIds: [organizationId] }),
       },
       {
@@ -121,6 +134,13 @@ export function InteractionDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
+          {recordId === undefined && editing == null && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium">Contact</span>
+              <ContactPicker value={picked} onChange={setPicked} />
+            </label>
+          )}
+
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium">Type</span>
             <select
@@ -183,7 +203,7 @@ export function InteractionDialog({
           >
             Cancel
           </Button>
-          <Button disabled={busy} onClick={save}>
+          <Button disabled={busy || subjectId === undefined} onClick={save}>
             {busy ? 'Saving…' : editing != null ? 'Save activity' : 'Log activity'}
           </Button>
         </DialogFooter>

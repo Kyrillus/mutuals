@@ -19,19 +19,23 @@ Most CRMs are built for sales teams. This one is built for a person and their ne
 
 ## Status
 
-**Pre-alpha. Stages 1–5 of 7 are done.** Invent a field in Settings and it is a real column straight
+**Pre-alpha. Stages 1–6 of 7 are done.** Invent a field in Settings and it is a real column straight
 away — filterable, sortable, on every contact, with no deploy and no migration. Open a person and you
 get their work history as a CV, every field inline-editable, and a history behind each value that says
 what it used to be, since when, and where it came from. Follow-ups repeat and reschedule themselves,
 the dashboard shows what needs you, and any table you have filtered can be saved as a named view.
 Drop in a LinkedIn or Google export and it maps the columns itself, finds the people who are in there
 twice, asks before importing any of them, and imports the same file again without creating anything.
+Ask it a question in plain language and it shows you the search it ran, so you can correct it or open
+it as a table. Type one sentence after a meeting and it proposes a contact, a company, the meeting
+and a follow-up — as an editable preview that saves nothing until you confirm. ⌘K searches everyone
+you know and everything you wrote down.
 
 - [`docs/BRIEF.md`](./docs/BRIEF.md) — the product specification: data model, every screen, the build
   plan. The source of truth for product decisions. Reference screenshots in [`docs/refs/`](./docs/refs).
 - [`docs/PLAN.md`](./docs/PLAN.md) — the implementation plan, in two layers: a plain summary and the
   technical detail.
-- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 108 records.
+- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — the architecture decision log, 114 records.
   `docs/adr-archive/` keeps the reasoning trail, including the designs that were rejected.
 
 ### Running it

@@ -1,22 +1,28 @@
 /**
  * `prompts.lock.json` against what the prompts emit right now (ADR-067).
  *
- * **The check is written and skips loudly**, which is the same shape ADR-095 chose for the pooler
- * test and for the same reason: a skipped test with a named reason is visible in every run's
- * output, while an absent test is visible nowhere. ADR-067 is explicit that the lock is enforced
- * *from the end of Stage 6*, because enforcing it during active iteration turns every wording tweak
- * into a version bump plus a stale fixture — and enforcing it from Stage 1 gated nothing, since no
- * prompts existed.
+ * **Enforced from the end of Stage 6**, which ADR-067 chose deliberately: enforcing it during active
+ * iteration turns every wording tweak into a version bump plus a stale fixture, and enforcing it
+ * from Stage 1 gated nothing because no prompts existed. Through Stage 6's first half the check
+ * lived here and skipped loudly, naming its own reason — the shape ADR-095 chose for the pooler
+ * test, because a skipped test with a reason is visible in every run and an absent one is visible
+ * nowhere.
  *
- * Flipping `LOCK_ENFORCED` to `true` at the end of Stage 6's second half is the whole change.
+ * A prompt edited without `pnpm llm:relock` now fails CI.
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import { LOCK_PATH, buildLock } from '../bin/llm-relock.ts'
 
-/** Stage 6, second half. Flip this, run `pnpm llm:relock`, commit the diff. */
-const LOCK_ENFORCED = false
+/**
+ * On, as of the end of Stage 6 (ADR-067, ADR-114).
+ *
+ * Editing a prompt now fails CI until `pnpm llm:relock` is run and the diff committed — which is
+ * the point: a reworded prompt with a stale lock is a recorded fixture that replays the answer to
+ * a question the prompt no longer asks.
+ */
+const LOCK_ENFORCED = true
 
 function committed(): unknown {
   return JSON.parse(readFileSync(LOCK_PATH, 'utf8'))
