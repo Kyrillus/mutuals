@@ -3362,8 +3362,12 @@ test. Replay stays what it is for: a developer re-running one recorded exchange 
 module **by exact path**, and one file holding `ask`, `search` and `quickCapture` makes that grant
 all-or-nothing — `search` is a trigram query over `search_document` and has no business being able
 to reach a model. `ask.ts`, `search.ts` and `quick-capture.ts` are three grants, two of which are
-currently for routes that still answer 501. A probe confirms the rule fires in both directions: a
-route importing `../llm/client.ts` and a `packages/db` file importing it both fail lint.
+currently for routes that still answer 501. **`boundary.test.ts` runs the real ESLint** over
+temporary files at real paths and over `routes/ask.ts` as it ships, and asserts both directions: a
+route not on the list, `packages/db` and `packages/core` are refused; the module importing itself,
+a type-only import and `ask.ts` are not. A `no-restricted-imports` zone is exactly the kind of
+configuration that survives a refactor in form and not in effect — one widened `ignores` glob and
+the boundary is gone with lint still green.
 
 **`getLlmStats` is a new operation** and is registered rather than planned. ADR-070 asks for
 `GET /api/v1/stats/llm`; ADR-031's list did not name it, so it is added the way ADR-098's ninth
@@ -3377,7 +3381,7 @@ and the comment had never caught up. A per-input hash there would vary per call,
 replaying. The SQL is unchanged and Kysely's ledger tracks migrations by name, so an applied database
 is unaffected; an integration test now asserts the two hashes behave the way the comment claims.
 
-**Four bugs, found by running the thing. Three were silent.**
+**Five bugs, found by running the thing. Three were silent and one was destructive.**
 
 - **The relation config is `targetObjectType`, not `target_object_type`.** Migration 0002 stores the
   snake_case form and `repositories/attributes.ts` normalises it on the way out, so reading the
@@ -3394,6 +3398,18 @@ is unaffected; an integration test now asserts the two hashes behave the way the
 - **`tags` offers `contains_any_of`, not `has_any_of`.** A test asserting a refusal passed for the
   wrong reason — the operator was rejected before the empty value list could be. The code was right;
   the test was checking something else and saying it was checking this.
+- **The boundary test deleted `routes/ask.ts`.** Its first version wrote a probe file at each path
+  it wanted to lint and removed it afterwards, and one of those paths was the real route — because
+  ADR-071 names `ask.ts` by exact path, so nothing else at that path answers the same question.
+  Every other test then failed to import it. Two changes: the "allowed" case lints the real file
+  where it lies and writes nothing, and the probe helper **refuses to write over a file that
+  exists**. The near-miss is worth the paragraph — a helper that creates files inside the source
+  tree has to be unable to touch one that matters.
+
+  The same first version also passed three "allowed" assertions **vacuously**: `projectService:
+true` refuses a path that is not on disk, so `lintText` returned a parsing error and no rule
+  messages at all, and "no restricted-import message" was true because there were no messages of
+  any kind. Both helpers now throw on a parse error rather than filtering it away.
 
 **One assumption that held.** ADR-072 named undici's `MockAgent` as the same-day fallback if msw's
 fetch interception misbehaved under Node 24. It does not: seventeen contract tests over the real
